@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#071A3D">
+  <title>Painel do Gestor — TIME CONSORT</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="css/painel.css">
+</head>
+<body>
+<div id="painel-app">
+
+  <!-- ══ LOGIN ═══════════════════════════════════════════════════════════════ -->
+  <div class="painel-view" data-painel-view="login" aria-hidden="false">
+    <div class="login-container">
+      <div class="login-box">
+        <div class="logo" role="img" aria-label="TIME CONSORT">
+          <svg viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <polygon points="0,20 8,10 16,20 8,30" fill="#D4AF37"/>
+            <text x="24" y="27" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#071A3D" font-weight="bold" letter-spacing="1.5">TIME CONSORT</text>
+          </svg>
+        </div>
+        <h1 class="login-titulo">Painel do Gestor</h1>
+        <p class="login-subtitulo">Acesso restrito</p>
+        <div class="campo-formulario">
+          <label class="campo-formulario__label" for="input-senha">Senha de acesso</label>
+          <input class="campo-formulario__input" type="password" id="input-senha"
+                 autocomplete="current-password" placeholder="••••••••"
+                 aria-describedby="erro-login">
+          <p class="campo-formulario__erro" id="erro-login" role="alert" aria-live="polite"></p>
+        </div>
+        <button class="btn-primario" id="btn-entrar" type="button">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ DASHBOARD ═══════════════════════════════════════════════════════════ -->
+  <div class="painel-view" data-painel-view="dashboard" aria-hidden="true">
+    <header class="painel-header">
+      <div class="painel-header__logo">
+        <svg viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <polygon points="0,20 8,10 16,20 8,30" fill="#D4AF37"/>
+          <text x="24" y="27" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#ffffff" font-weight="bold" letter-spacing="1.5">TIME CONSORT</text>
+        </svg>
+        <span class="painel-header__subtitulo">Painel do Gestor</span>
+      </div>
+      <button class="btn-logout painel-header__btn-sair" type="button">Sair</button>
+    </header>
+
+    <main class="painel-corpo">
+      <div class="painel-secao">
+        <h2 class="painel-secao__titulo">Visão geral</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-card__rotulo">Concluídos</span>
+            <span class="stat-card__valor" id="stat-concluidos-val">—</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card__rotulo">Total gerado</span>
+            <span class="stat-card__valor" id="stat-total-val">—</span>
+          </div>
+          <div class="stat-card stat-card--destaque">
+            <span class="stat-card__rotulo">DISC predominante</span>
+            <span class="stat-card__valor stat-card__valor--md" id="stat-disc-val">—</span>
+          </div>
+          <div class="stat-card stat-card--destaque">
+            <span class="stat-card__rotulo">Temperamento top</span>
+            <span class="stat-card__valor stat-card__valor--md" id="stat-temp-val">—</span>
+          </div>
+          <div class="stat-card stat-card--destaque">
+            <span class="stat-card__rotulo">Aptidão principal</span>
+            <span class="stat-card__valor stat-card__valor--md" id="stat-apt-val">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="painel-secao">
+        <div class="painel-secao__cabecalho">
+          <h2 class="painel-secao__titulo painel-secao__titulo--inline">Assessments recentes</h2>
+          <button class="btn-link" id="btn-ver-todos" type="button">Ver todos →</button>
+        </div>
+        <div class="painel-tabela-container">
+          <table class="painel-tabela" aria-label="Assessments recentes">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th class="col-email">E-mail</th>
+                <th>DISC</th>
+                <th class="col-apt">Aptidão</th>
+                <th class="col-data">Concluído em</th>
+                <th class="col-link" aria-label="Link"></th>
+              </tr>
+            </thead>
+            <tbody id="tbody-recentes">
+              <tr><td colspan="6" class="painel-tabela__vazio">Carregando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ══ LISTA ════════════════════════════════════════════════════════════════ -->
+  <div class="painel-view" data-painel-view="lista" aria-hidden="true">
+    <header class="painel-header">
+      <div class="painel-header__nav">
+        <button class="btn-voltar" id="btn-voltar-dashboard" type="button">← Painel</button>
+        <span class="painel-header__titulo">Assessments Concluídos</span>
+      </div>
+      <button class="btn-logout painel-header__btn-sair" type="button">Sair</button>
+    </header>
+
+    <div class="painel-busca-bar">
+      <div class="painel-busca__wrapper">
+        <span class="painel-busca__icone" aria-hidden="true">⌕</span>
+        <input class="painel-busca__input" type="search" id="input-busca"
+               placeholder="Buscar por nome, e-mail ou código…"
+               autocomplete="off" aria-label="Buscar assessments">
+      </div>
+      <p class="lista-status" id="lista-status" aria-live="polite"></p>
+    </div>
+
+    <main class="painel-corpo">
+      <div class="painel-tabela-container">
+        <table class="painel-tabela" aria-label="Lista de assessments">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th class="col-email">E-mail</th>
+              <th class="col-codigo">Código</th>
+              <th>DISC</th>
+              <th class="col-apt">Aptidão</th>
+              <th class="col-data">Concluído em</th>
+              <th class="col-link" aria-label="Link"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-lista">
+            <tr><td colspan="7" class="painel-tabela__vazio">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="painel-paginacao" aria-label="Paginação">
+        <button class="btn-pag" id="btn-anterior-pag" type="button" disabled>← Anterior</button>
+        <span class="pag-info" id="pag-info" aria-live="polite">Página 1 de 1</span>
+        <button class="btn-pag" id="btn-proxima-pag" type="button" disabled>Próxima →</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- ══ DETALHE ══════════════════════════════════════════════════════════════ -->
+  <div class="painel-view" data-painel-view="detalhe" aria-hidden="true">
+    <header class="painel-header">
+      <div class="painel-header__nav">
+        <button class="btn-voltar" id="btn-voltar-detalhe" type="button">← Voltar</button>
+      </div>
+      <button class="btn-logout painel-header__btn-sair" type="button">Sair</button>
+    </header>
+
+    <div class="detalhe-meta">
+      <h2 class="detalhe-meta__nome" id="detalhe-titulo"></h2>
+      <div class="detalhe-meta__info">
+        <span id="detalhe-email"></span>
+        <span class="detalhe-meta__sep" aria-hidden="true">·</span>
+        <span>Código: <code id="detalhe-codigo"></code></span>
+        <span class="detalhe-meta__sep" aria-hidden="true">·</span>
+        <span>Concluído: <span id="detalhe-data"></span></span>
+      </div>
+      <div class="detalhe-meta__url-row">
+        <a id="detalhe-url" class="detalhe-meta__url-link" href="#" target="_blank"
+           rel="noopener noreferrer" aria-label="Abrir link do assessment"></a>
+        <button class="btn-copiar" id="btn-copiar-url" type="button"
+                aria-label="Copiar link do assessment">
+          <span class="btn-copiar__icone" aria-hidden="true">⎘</span>
+          <span class="btn-copiar__texto">Copiar link</span>
+        </button>
+      </div>
+    </div>
+
+    <main class="painel-corpo painel-corpo--detalhe">
+      <div id="detalhe-relatorio"></div>
+    </main>
+  </div>
+
+</div><!-- /#painel-app -->
+
+<script src="../js/renderer.js"></script>
+<script src="js/painel.js"></script>
+</body>
+</html>

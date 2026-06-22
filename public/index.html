@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Assessment Comportamental — EXTRAORDINÁRIOS TIME CONSORT">
+  <meta name="theme-color" content="#071A3D">
+  <title>Assessment Comportamental — TIME CONSORT</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- ══ BARRA DE 5 ETAPAS — fixa no topo, visível apenas no fluxo do assessment ══ -->
+<nav id="etapas-bar" class="etapas-bar" hidden aria-label="Progresso do assessment">
+  <div class="etapas-bar__inner">
+    <div class="etapa-item" data-etapa="1">
+      <div class="etapa-item__bolinha" aria-hidden="true">1</div>
+      <span class="etapa-item__rotulo">Identificação</span>
+    </div>
+    <div class="etapa-item__linha" aria-hidden="true"></div>
+    <div class="etapa-item" data-etapa="2">
+      <div class="etapa-item__bolinha" aria-hidden="true">2</div>
+      <span class="etapa-item__rotulo">Instruções</span>
+    </div>
+    <div class="etapa-item__linha" aria-hidden="true"></div>
+    <div class="etapa-item" data-etapa="3">
+      <div class="etapa-item__bolinha" aria-hidden="true">3</div>
+      <span class="etapa-item__rotulo">Perguntas</span>
+    </div>
+    <div class="etapa-item__linha" aria-hidden="true"></div>
+    <div class="etapa-item" data-etapa="4">
+      <div class="etapa-item__bolinha" aria-hidden="true">4</div>
+      <span class="etapa-item__rotulo">Revisão</span>
+    </div>
+    <div class="etapa-item__linha" aria-hidden="true"></div>
+    <div class="etapa-item" data-etapa="5">
+      <div class="etapa-item__bolinha" aria-hidden="true">5</div>
+      <span class="etapa-item__rotulo">Resultado</span>
+    </div>
+  </div>
+</nav>
+
+<div id="app">
+
+  <!-- ── 1. Carregando ─────────────────────────────────────────────────────── -->
+  <div class="view"
+       data-view="carregando"
+       aria-hidden="false"
+       role="status"
+       aria-live="polite"
+       aria-label="Carregando assessment">
+    <div class="view__centro">
+      <div class="logo" role="img" aria-label="TIME CONSORT">
+        <svg viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <polygon points="0,20 8,10 16,20 8,30" fill="#D4AF37"/>
+          <text x="24" y="27" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#071A3D" font-weight="bold" letter-spacing="1.5">TIME CONSORT</text>
+        </svg>
+      </div>
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="carregando__texto">Carregando…</p>
+    </div>
+  </div>
+
+  <!-- ── 2. Link inválido ──────────────────────────────────────────────────── -->
+  <div class="view" data-view="link-invalido" aria-hidden="true">
+    <div class="estado-terminal">
+      <div class="estado-terminal__icone estado-terminal__icone--erro" aria-hidden="true">⚠</div>
+      <h1 class="estado-terminal__titulo">Link inválido</h1>
+      <p class="estado-terminal__descricao">
+        O link que você acessou não é válido ou não existe.
+        Entre em contato com a imobiliária para receber um novo link de acesso.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── 3. Link expirado ──────────────────────────────────────────────────── -->
+  <div class="view" data-view="link-expirado" aria-hidden="true">
+    <div class="estado-terminal">
+      <div class="estado-terminal__icone estado-terminal__icone--aviso" aria-hidden="true">⏱</div>
+      <h1 class="estado-terminal__titulo">Link expirado</h1>
+      <p class="estado-terminal__descricao">
+        Este link de acesso expirou.
+        Entre em contato com a imobiliária para solicitar um novo link.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── 4. Já concluído ───────────────────────────────────────────────────── -->
+  <div class="view" data-view="ja-concluido" aria-hidden="true">
+    <div class="estado-terminal">
+      <div class="estado-terminal__icone estado-terminal__icone--ok" aria-hidden="true">✓</div>
+      <h1 class="estado-terminal__titulo">Assessment já realizado</h1>
+      <p class="estado-terminal__descricao">
+        Você já concluiu este assessment. Cada link é de uso único.
+        Entre em contato com a imobiliária caso precise de mais informações.
+      </p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       ETAPA 1 — IDENTIFICAÇÃO
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="view view--com-barra" data-view="identificacao" aria-hidden="true">
+    <div class="view__conteudo ident__conteudo">
+
+      <div class="ident__logo-wrap">
+        <div class="logo" role="img" aria-label="TIME CONSORT">
+          <svg viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <polygon points="0,20 8,10 16,20 8,30" fill="#D4AF37"/>
+            <text x="24" y="27" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#071A3D" font-weight="bold" letter-spacing="1.5">TIME CONSORT</text>
+          </svg>
+        </div>
+      </div>
+
+      <h1 class="ident__saudacao">
+        Olá, <span class="ident__nome-do-link"></span>!
+      </h1>
+
+      <p class="ident__descricao">
+        Você foi convidado para realizar o
+        <strong>Assessment Comportamental de Corretores de Alto Padrão</strong>.
+        Este processo nos ajudará a entender melhor seu perfil e potencial
+        no mercado imobiliário premium.
+      </p>
+
+      <p class="ident__info-retomada" hidden></p>
+
+      <hr class="ident__separador" aria-hidden="true">
+
+      <div class="campo-formulario">
+        <label class="campo-formulario__label" for="input-nome">
+          Confirme seu nome completo
+          <span class="visually-hidden"> (obrigatório)</span>
+        </label>
+        <input
+          class="campo-formulario__input"
+          type="text"
+          id="input-nome"
+          name="nome"
+          autocomplete="name"
+          required
+          minlength="3"
+          placeholder="Seu nome completo"
+          aria-required="true"
+          aria-describedby="erro-ident-nome"
+        >
+        <p class="campo-formulario__erro"
+           id="erro-ident-nome"
+           role="alert"
+           aria-live="polite"></p>
+      </div>
+
+      <div class="campo-formulario">
+        <label class="campo-formulario__label" for="input-cargo">
+          Cargo atual
+          <span class="campo-formulario__opcional">(opcional)</span>
+        </label>
+        <input
+          class="campo-formulario__input"
+          type="text"
+          id="input-cargo"
+          name="cargo"
+          autocomplete="organization-title"
+          placeholder="Ex: Corretor Sênior"
+        >
+      </div>
+
+    </div>
+
+    <div class="view__rodape">
+      <button class="btn-primario ident__btn-iniciar" type="button">
+        Iniciar Assessment
+      </button>
+      <button class="btn-secundario ident__btn-retomar" type="button" hidden>
+        ↻ Retomar de onde parei
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       ETAPA 2 — INSTRUÇÕES
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="view view--com-barra" data-view="instrucoes" aria-hidden="true">
+    <div class="view__cabecalho">
+      <h1 class="view__titulo">Antes de começar</h1>
+    </div>
+    <div class="view__conteudo">
+      <ul class="instrucoes__lista" role="list">
+        <li class="instrucoes__item">
+          <span class="instrucoes__icone" aria-hidden="true">⏱</span>
+          <div>
+            <strong>Tempo estimado: 10 a 20 minutos</strong>
+            <p>Depende do seu ritmo. Não há pressa para responder.</p>
+          </div>
+        </li>
+        <li class="instrucoes__item">
+          <span class="instrucoes__icone" aria-hidden="true">✓</span>
+          <div>
+            <strong>Não há respostas certas ou erradas</strong>
+            <p>Todas as alternativas revelam algo sobre o seu estilo de trabalho.</p>
+          </div>
+        </li>
+        <li class="instrucoes__item">
+          <span class="instrucoes__icone" aria-hidden="true">★</span>
+          <div>
+            <strong>Responda com base no que você realmente faz</strong>
+            <p>Não no que seria o ideal. Quanto mais autêntico, mais preciso o resultado.</p>
+          </div>
+        </li>
+        <li class="instrucoes__item" id="instrucoes-item-pausar">
+          <span class="instrucoes__icone" aria-hidden="true">↻</span>
+          <div>
+            <strong>Você pode pausar e retomar depois</strong>
+            <p>Seu progresso é salvo automaticamente neste dispositivo.</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="view__rodape">
+      <button class="btn-primario instrucoes__btn-comecar" type="button">
+        Começar perguntas
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       ETAPA 3 — PERGUNTAS DO ASSESSMENT
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="view view--com-barra" data-view="questao" aria-hidden="true">
+    <div class="view__cabecalho questao__cabecalho">
+      <div class="questao__contador" aria-live="polite" aria-atomic="true">
+        Pergunta <span class="questao__numero">1</span> de <span class="questao__total">10</span>
+      </div>
+      <div class="barra-progresso"
+           role="progressbar"
+           aria-valuemin="0"
+           aria-valuemax="100"
+           aria-valuenow="0"
+           aria-label="Progresso das perguntas">
+        <div class="barra-progresso__preenchimento questao__progresso-preenchimento"
+             style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div class="view__conteudo questao__conteudo">
+      <p class="questao__categoria" aria-hidden="true"></p>
+      <p class="questao__pergunta" tabindex="-1"></p>
+      <div class="questao__opcoes" role="group" aria-label="Escolha uma alternativa">
+        <button class="questao__opcao" data-letra="A" type="button" aria-pressed="false">
+          <span class="questao__opcao-letra" aria-hidden="true">A</span>
+          <span class="questao__opcao-texto"></span>
+        </button>
+        <button class="questao__opcao" data-letra="B" type="button" aria-pressed="false">
+          <span class="questao__opcao-letra" aria-hidden="true">B</span>
+          <span class="questao__opcao-texto"></span>
+        </button>
+        <button class="questao__opcao" data-letra="C" type="button" aria-pressed="false">
+          <span class="questao__opcao-letra" aria-hidden="true">C</span>
+          <span class="questao__opcao-texto"></span>
+        </button>
+        <button class="questao__opcao" data-letra="D" type="button" aria-pressed="false">
+          <span class="questao__opcao-letra" aria-hidden="true">D</span>
+          <span class="questao__opcao-texto"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="view__rodape questao__rodape">
+      <button class="btn-secundario questao__btn-anterior" type="button" disabled
+              aria-label="Ir para a pergunta anterior">
+        ← Anterior
+      </button>
+      <button class="btn-primario questao__btn-proxima" type="button" disabled
+              aria-label="Ir para a próxima pergunta">
+        Próxima →
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       ETAPA 4 — REVISÃO / CONFIRMAÇÃO
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="view view--com-barra" data-view="confirmacao" aria-hidden="true">
+    <div class="view__cabecalho">
+      <h1 class="view__titulo">Tudo pronto!</h1>
+    </div>
+    <div class="view__conteudo">
+      <div class="confirmacao__resumo">
+        <p>
+          Você respondeu
+          <strong>
+            <span class="confirmacao__respondidas">0</span>
+            de <span class="confirmacao__total">0</span>
+          </strong>
+          perguntas.
+        </p>
+      </div>
+      <p class="confirmacao__texto">
+        Ao enviar, suas respostas serão processadas e o resultado estará
+        disponível em instantes.
+      </p>
+      <p class="confirmacao__aviso-incompleto" hidden>
+        ⚠ Responda todas as perguntas antes de enviar.
+      </p>
+    </div>
+    <div class="view__rodape">
+      <button class="btn-primario confirmacao__btn-enviar" type="button">
+        Enviar Assessment
+      </button>
+      <button class="btn-secundario confirmacao__btn-revisar" type="button">
+        ← Revisar respostas
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Enviando (estado transitório) ────────────────────────────────────── -->
+  <div class="view"
+       data-view="enviando"
+       aria-hidden="true"
+       role="status"
+       aria-live="polite"
+       aria-label="Enviando suas respostas">
+    <div class="view__centro">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="enviando__texto">Enviando suas respostas…</p>
+      <p class="enviando__subtexto">Por favor, aguarde.</p>
+    </div>
+  </div>
+
+  <!-- ── Erro de envio ─────────────────────────────────────────────────────── -->
+  <div class="view" data-view="erro-envio" aria-hidden="true">
+    <div class="view__centro">
+      <div class="estado-terminal__icone estado-terminal__icone--erro" aria-hidden="true">⚠</div>
+      <h1 class="estado-terminal__titulo">Algo deu errado</h1>
+      <p class="estado-terminal__descricao">
+        Suas respostas estão salvas neste dispositivo.
+        Tente enviar novamente.
+      </p>
+      <button class="btn-primario erro-envio__btn-retry" type="button"
+              style="max-width: 280px;">
+        Tentar novamente
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       ETAPA 5 — RESULTADO FINAL
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="view view--resultado view--com-barra" data-view="resultado" aria-hidden="true">
+    <div class="resultado__cabecalho">
+      <div class="logo" role="img" aria-label="TIME CONSORT"
+           style="margin-bottom: 0;">
+        <svg viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <polygon points="0,20 8,10 16,20 8,30" fill="#D4AF37"/>
+          <text x="24" y="27" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#ffffff" font-weight="bold" letter-spacing="1.5">TIME CONSORT</text>
+        </svg>
+      </div>
+      <h1 class="resultado__titulo">Seu Resultado</h1>
+      <p class="resultado__saudacao">
+        Parabéns, <span class="resultado__nome"></span>!
+        Seu assessment foi concluído com sucesso.
+      </p>
+    </div>
+    <div class="resultado__corpo">
+      <div class="resultado__relatorio"></div>
+    </div>
+  </div>
+
+</div><!-- /#app -->
+
+<script src="/js/storage.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/renderer.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
