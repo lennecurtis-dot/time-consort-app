@@ -127,6 +127,12 @@ function listarConcluidos({ search = '', limite = 20, offset = 0 } = {}) {
   return { items, total };
 }
 
+function criarAssessment(nome, email, codigo) {
+  return getDb()
+    .prepare('INSERT INTO assessments (nome, email, codigo) VALUES (?, ?, ?)')
+    .run(nome, email, codigo);
+}
+
 function buscarAssessmentGestor(id) {
   return getDb()
     .prepare('SELECT * FROM assessments WHERE id = ?')
@@ -182,5 +188,5 @@ function obterEstatisticas() {
 module.exports = {
   getDb, STATUS_VALIDOS,
   buscarPorCodigo, salvarResultado,
-  listarConcluidos, buscarAssessmentGestor, obterEstatisticas
+  criarAssessment, listarConcluidos, buscarAssessmentGestor, obterEstatisticas
 };

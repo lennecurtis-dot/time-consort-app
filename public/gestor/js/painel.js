@@ -27,7 +27,6 @@ async function copiarTexto(texto, btnEl) {
   try {
     await navigator.clipboard.writeText(texto);
   } catch (_) {
-    // fallback para navegadores sem clipboard API
     const el = document.createElement('textarea');
     el.value = texto;
     el.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
@@ -37,13 +36,13 @@ async function copiarTexto(texto, btnEl) {
     document.body.removeChild(el);
   }
   if (!btnEl) return;
-  const textoOriginal = btnEl.querySelector('.btn-copiar__texto');
-  if (textoOriginal) {
-    const original = textoOriginal.textContent;
-    textoOriginal.textContent = 'Copiado!';
+  const textoEl = btnEl.querySelector('.btn-copiar__texto');
+  if (textoEl) {
+    const original = textoEl.textContent;
+    textoEl.textContent = 'Copiado!';
     btnEl.classList.add('btn-copiar--ok');
     setTimeout(() => {
-      textoOriginal.textContent = original;
+      textoEl.textContent = original;
       btnEl.classList.remove('btn-copiar--ok');
     }, 2000);
   }
@@ -148,6 +147,7 @@ function deslogar() {
   apiFetch('/api/gestor/logout', { method: 'POST' }).catch(() => {});
   state.token = null;
   sessionStorage.removeItem(SESSION_KEY);
+  fecharModal();
   navegarPara('login');
   setTimeout(() => document.getElementById('input-senha').focus(), 60);
 }
@@ -160,7 +160,7 @@ async function carregarDashboard() {
     .forEach(id => { document.getElementById(id).textContent = '…'; });
 
   document.getElementById('tbody-recentes').innerHTML =
-    '<tr><td colspan="5" class="painel-tabela__vazio">Carregando…</td></tr>';
+    '<tr><td colspan="6" class="painel-tabela__vazio">Carregando…</td></tr>';
 
   try {
     const { status, data } = await apiFetch('/api/gestor/stats');
@@ -184,7 +184,7 @@ async function carregarDashboard() {
     const recentes = (data.items || []).slice(0, 5);
 
     if (!recentes.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="painel-tabela__vazio">Nenhum assessment concluído ainda.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="painel-tabela__vazio">Nenhum assessment concluído ainda.</td></tr>';
       return;
     }
 
@@ -216,14 +216,11 @@ async function carregarDashboard() {
       });
     });
     tbody.querySelectorAll('.btn-copiar-mini').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        copiarMini(btn);
-      });
+      btn.addEventListener('click', e => { e.stopPropagation(); copiarMini(btn); });
     });
   } catch (_) {
     document.getElementById('tbody-recentes').innerHTML =
-      '<tr><td colspan="5" class="painel-tabela__vazio">Erro ao carregar.</td></tr>';
+      '<tr><td colspan="6" class="painel-tabela__vazio">Erro ao carregar.</td></tr>';
   }
 }
 
@@ -233,10 +230,10 @@ async function carregarLista(pagina = 1, busca = '') {
   state.paginaAtual = pagina;
   state.buscaAtual  = busca;
 
-  document.getElementById('input-busca').value    = busca;
-  document.getElementById('lista-status').textContent = 'Carregando…';
-  document.getElementById('tbody-lista').innerHTML =
-    '<tr><td colspan="6" class="painel-tabela__vazio">Carregando…</td></tr>';
+  document.getElementById('input-busca').value         = busca;
+  document.getElementById('lista-status').textContent  = 'Carregando…';
+  document.getElementById('tbody-lista').innerHTML     =
+    '<tr><td colspan="7" class="painel-tabela__vazio">Carregando…</td></tr>';
 
   const params = new URLSearchParams({ pagina: String(pagina) });
   if (busca) params.set('q', busca);
@@ -258,7 +255,7 @@ async function carregarLista(pagina = 1, busca = '') {
   } catch (_) {
     document.getElementById('lista-status').textContent = 'Erro ao carregar.';
     document.getElementById('tbody-lista').innerHTML =
-      '<tr><td colspan="6" class="painel-tabela__vazio">Erro ao carregar.</td></tr>';
+      '<tr><td colspan="7" class="painel-tabela__vazio">Erro ao carregar.</td></tr>';
   }
 }
 
@@ -266,7 +263,7 @@ function renderizarTabelaLista() {
   const tbody = document.getElementById('tbody-lista');
 
   if (!state.assessments.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="painel-tabela__vazio">Nenhum resultado encontrado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="painel-tabela__vazio">Nenhum resultado encontrado.</td></tr>';
     return;
   }
 
@@ -299,10 +296,7 @@ function renderizarTabelaLista() {
     });
   });
   tbody.querySelectorAll('.btn-copiar-mini').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      copiarMini(btn);
-    });
+    btn.addEventListener('click', e => { e.stopPropagation(); copiarMini(btn); });
   });
 }
 
@@ -318,7 +312,6 @@ async function verDetalhe(id, origem = 'lista') {
   const container = document.getElementById('detalhe-relatorio');
   container.innerHTML = '<div class="painel-carregando">Carregando relatório…</div>';
 
-  // Define label do botão voltar antes de navegar
   const btnVoltar = document.getElementById('btn-voltar-detalhe');
   btnVoltar.textContent = origem === 'dashboard' ? '← Painel' : '← Lista';
 
@@ -359,6 +352,95 @@ async function verDetalhe(id, origem = 'lista') {
     }
   } catch (_) {
     container.innerHTML = '<p class="painel-erro">Erro de conexão. Tente novamente.</p>';
+  }
+}
+
+// ─── Modal Novo Assessment ──────────────────────────────────────────────────────
+function abrirModal() {
+  resetarModal();
+  const overlay = document.getElementById('modal-novo');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('modal-input-nome').focus(), 50);
+}
+
+function fecharModal() {
+  const overlay = document.getElementById('modal-novo');
+  if (!overlay) return;
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+function resetarModal() {
+  document.getElementById('modal-corpo-form').hidden = false;
+  document.getElementById('modal-resultado').hidden  = true;
+  document.getElementById('modal-input-nome').value  = '';
+  document.getElementById('modal-input-email').value = '';
+  document.getElementById('modal-erro-nome').textContent  = '';
+  document.getElementById('modal-erro-email').textContent = '';
+  const btn = document.getElementById('btn-gerar-link');
+  btn.disabled    = false;
+  btn.textContent = 'Gerar Link';
+}
+
+async function gerarLink() {
+  const nomeEl    = document.getElementById('modal-input-nome');
+  const emailEl   = document.getElementById('modal-input-email');
+  const erroNome  = document.getElementById('modal-erro-nome');
+  const erroEmail = document.getElementById('modal-erro-email');
+  const btnGerar  = document.getElementById('btn-gerar-link');
+
+  erroNome.textContent  = '';
+  erroEmail.textContent = '';
+
+  const nome  = nomeEl.value.trim();
+  const email = emailEl.value.trim();
+
+  let valido = true;
+  if (!nome || nome.length < 3) {
+    erroNome.textContent = 'Nome obrigatório (mínimo 3 caracteres).';
+    nomeEl.focus();
+    valido = false;
+  }
+  if (!email || !email.includes('@') || !email.includes('.')) {
+    erroEmail.textContent = 'E-mail inválido.';
+    if (valido) emailEl.focus();
+    valido = false;
+  }
+  if (!valido) return;
+
+  btnGerar.disabled    = true;
+  btnGerar.textContent = 'Gerando…';
+
+  try {
+    const { status, data } = await apiFetch('/api/gestor/assessments', {
+      method: 'POST',
+      body: JSON.stringify({ nome, email })
+    });
+
+    if (status === 401) { deslogar(); return; }
+
+    if (status !== 200 || !data.ok) {
+      erroNome.textContent = data.erro || 'Erro ao gerar link. Tente novamente.';
+      btnGerar.disabled    = false;
+      btnGerar.textContent = 'Gerar Link';
+      return;
+    }
+
+    // Exibir resultado
+    document.getElementById('modal-corpo-form').hidden = true;
+    const resultado = document.getElementById('modal-resultado');
+    resultado.hidden = false;
+    document.getElementById('modal-url-texto').textContent = data.url;
+
+    const btnCopiar = document.getElementById('btn-copiar-novo');
+    btnCopiar.onclick = () => copiarTexto(data.url, btnCopiar);
+    btnCopiar.focus();
+
+  } catch (_) {
+    erroNome.textContent = 'Erro de conexão. Tente novamente.';
+    btnGerar.disabled    = false;
+    btnGerar.textContent = 'Gerar Link';
   }
 }
 
@@ -408,6 +490,30 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       carregarLista(state.paginaAtual, state.buscaAtual);
     }
+  });
+
+  // Modal — abrir
+  document.getElementById('btn-abrir-modal').addEventListener('click', abrirModal);
+  document.getElementById('btn-abrir-modal-lista').addEventListener('click', abrirModal);
+
+  // Modal — fechar
+  document.getElementById('btn-fechar-modal').addEventListener('click', fecharModal);
+  document.getElementById('modal-novo').addEventListener('click', e => {
+    if (e.target === e.currentTarget) fecharModal();
+  });
+
+  // Modal — gerar link
+  document.getElementById('btn-gerar-link').addEventListener('click', gerarLink);
+  document.getElementById('modal-input-email').addEventListener('keydown', e => {
+    if (e.key === 'Enter') gerarLink();
+  });
+
+  // Modal — gerar outro link
+  document.getElementById('btn-outro-link').addEventListener('click', resetarModal);
+
+  // Fechar com Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') fecharModal();
   });
 
   // Sessão ativa ao abrir a página

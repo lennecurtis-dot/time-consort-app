@@ -47,7 +47,12 @@
         </svg>
         <span class="painel-header__subtitulo">Painel do Gestor</span>
       </div>
-      <button class="btn-logout painel-header__btn-sair" type="button">Sair</button>
+      <div class="painel-header__acoes">
+        <button class="btn-novo-assessment" id="btn-abrir-modal" type="button">
+          + Novo Assessment
+        </button>
+        <button class="btn-logout painel-header__btn-sair" type="button">Sair</button>
+      </div>
     </header>
 
     <main class="painel-corpo">
@@ -91,7 +96,7 @@
                 <th>DISC</th>
                 <th class="col-apt">Aptidão</th>
                 <th class="col-data">Concluído em</th>
-                <th class="col-link" aria-label="Link"></th>
+                <th class="col-link" aria-label="Link">Link</th>
               </tr>
             </thead>
             <tbody id="tbody-recentes">
@@ -110,7 +115,12 @@
         <button class="btn-voltar" id="btn-voltar-dashboard" type="button">← Painel</button>
         <span class="painel-header__titulo">Assessments Concluídos</span>
       </div>
-      <button class="btn-logout painel-header__btn-sair" type="button">Sair</button>
+      <div class="painel-header__acoes">
+        <button class="btn-novo-assessment btn-novo-assessment--sm" id="btn-abrir-modal-lista" type="button">
+          + Novo
+        </button>
+        <button class="btn-logout painel-header__btn-sair" type="button">Sair</button>
+      </div>
     </header>
 
     <div class="painel-busca-bar">
@@ -134,7 +144,7 @@
               <th>DISC</th>
               <th class="col-apt">Aptidão</th>
               <th class="col-data">Concluído em</th>
-              <th class="col-link" aria-label="Link"></th>
+              <th class="col-link">Link</th>
             </tr>
           </thead>
           <tbody id="tbody-lista">
@@ -183,6 +193,59 @@
     <main class="painel-corpo painel-corpo--detalhe">
       <div id="detalhe-relatorio"></div>
     </main>
+  </div>
+
+  <!-- ══ MODAL NOVO ASSESSMENT ════════════════════════════════════════════════ -->
+  <div id="modal-novo" class="modal-overlay" aria-hidden="true"
+       role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 class="modal-titulo" id="modal-titulo">Novo Assessment</h2>
+        <button class="modal-fechar" id="btn-fechar-modal" type="button"
+                aria-label="Fechar modal">✕</button>
+      </div>
+
+      <!-- Formulário -->
+      <div class="modal-corpo" id="modal-corpo-form">
+        <div class="campo-formulario">
+          <label class="campo-formulario__label" for="modal-input-nome">
+            Nome do corretor
+          </label>
+          <input class="campo-formulario__input" type="text" id="modal-input-nome"
+                 autocomplete="name" placeholder="Nome completo" minlength="3"
+                 aria-describedby="modal-erro-nome">
+          <p class="campo-formulario__erro" id="modal-erro-nome" role="alert" aria-live="polite"></p>
+        </div>
+        <div class="campo-formulario">
+          <label class="campo-formulario__label" for="modal-input-email">
+            E-mail
+          </label>
+          <input class="campo-formulario__input" type="email" id="modal-input-email"
+                 autocomplete="email" placeholder="email@exemplo.com"
+                 aria-describedby="modal-erro-email">
+          <p class="campo-formulario__erro" id="modal-erro-email" role="alert" aria-live="polite"></p>
+        </div>
+        <button class="btn-primario" id="btn-gerar-link" type="button">
+          Gerar Link
+        </button>
+      </div>
+
+      <!-- Resultado -->
+      <div class="modal-resultado" id="modal-resultado" hidden>
+        <div class="modal-resultado__icone" aria-hidden="true">✓</div>
+        <p class="modal-resultado__label">Link gerado com sucesso!</p>
+        <div class="modal-resultado__url-box">
+          <span class="modal-resultado__url" id="modal-url-texto"></span>
+        </div>
+        <button class="btn-copiar modal-resultado__btn-copiar" id="btn-copiar-novo" type="button">
+          <span class="btn-copiar__icone" aria-hidden="true">⎘</span>
+          <span class="btn-copiar__texto">Copiar Link</span>
+        </button>
+        <button class="btn-secundario modal-resultado__btn-novo" id="btn-outro-link" type="button">
+          Gerar outro link
+        </button>
+      </div>
+    </div>
   </div>
 
 </div><!-- /#painel-app -->

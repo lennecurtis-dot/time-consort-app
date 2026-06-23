@@ -6,7 +6,7 @@ const express  = require('express');
 const path     = require('path');
 const { calcularResultado } = require('./scoring-engine');
 const { buscarPorCodigo, salvarResultado,
-        listarConcluidos, buscarAssessmentGestor, obterEstatisticas } = require('./database');
+        criarAssessment, listarConcluidos, buscarAssessmentGestor, obterEstatisticas } = require('./database');
 const questions = require('./questions');
 
 const app  = express();
@@ -181,6 +181,31 @@ app.post('/api/gestor/logout', autenticacaoGestor, (req, res) => {
 // GET /api/gestor/stats
 app.get('/api/gestor/stats', autenticacaoGestor, (_req, res) => {
   return res.json(obterEstatisticas());
+});
+
+// POST /api/gestor/assessments — cria novo assessment e retorna link
+app.post('/api/gestor/assessments', autenticacaoGestor, (req, res) => {
+  const { nome, email } = req.body || {};
+
+  if (!nome || typeof nome !== 'string' || nome.trim().length < 3) {
+    return res.status(400).json({ erro: 'Nome obrigatório (mínimo 3 caracteres).' });
+  }
+  if (!email || typeof email !== 'string' || !email.includes('@') || !email.includes('.')) {
+    return res.status(400).json({ erro: 'E-mail inválido.' });
+  }
+
+  const nomeLimpo  = nome.trim().slice(0, 200);
+  const emailLimpo = email.trim().toLowerCase().slice(0, 200);
+  const codigo     = crypto.randomBytes(8).toString('hex'); // 16 chars hex
+
+  try {
+    criarAssessment(nomeLimpo, emailLimpo, codigo);
+  } catch (err) {
+    console.error('[criar assessment] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno ao criar assessment.' });
+  }
+
+  return res.json({ ok: true, codigo, url: `${getBaseUrl()}/a/${codigo}` });
 });
 
 // GET /api/gestor/assessments?q=&pagina=
