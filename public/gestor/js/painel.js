@@ -513,8 +513,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Fechar com Escape
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') fecharModal();
+    if (e.key === 'Escape') { fecharModal(); fecharModalPP(); }
   });
+
+  // Pior Patrão — botão no header do dashboard
+  document.getElementById('btn-ir-pp').addEventListener('click', carregarPiorPatrao);
+
+  // Pior Patrão — voltar ao dashboard
+  document.getElementById('btn-voltar-pp').addEventListener('click', carregarDashboard);
+
+  // Pior Patrão — abrir modal de novo corretor
+  document.getElementById('btn-abrir-modal-pp').addEventListener('click', abrirModalPP);
+  document.getElementById('btn-fechar-modal-pp').addEventListener('click', fecharModalPP);
+  document.getElementById('modal-pp').addEventListener('click', e => {
+    if (e.target === e.currentTarget) fecharModalPP();
+  });
+  document.getElementById('btn-cadastrar-pp').addEventListener('click', cadastrarCorretorPP);
+  document.getElementById('btn-outro-pp').addEventListener('click', resetarModalPP);
 
   // Sessão ativa ao abrir a página
   if (state.token) {
@@ -524,3 +539,206 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => document.getElementById('input-senha').focus(), 60);
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MÓDULO PIOR PATRÃO — lógica do painel do gestor
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function labelSituacaoPP(s) {
+  return s === 'estagiario' ? 'Estagiário' : 'Corretor Pleno';
+}
+
+// ─── Carregar lista de corretores PP ─────────────────────────────────────────
+async function carregarPiorPatrao() {
+  navegarPara('pior-patrao');
+  document.getElementById('tbody-pp').innerHTML =
+    '<tr><td colspan="6" class="painel-tabela__vazio">Carregando…</td></tr>';
+
+  try {
+    const { status, data } = await apiFetch('/api/gestor/pp/corretores');
+    if (status === 401) { deslogar(); return; }
+
+    const tbody = document.getElementById('tbody-pp');
+    const lista = data.items || [];
+
+    if (!lista.length) {
+      tbody.innerHTML =
+        '<tr><td colspan="6" class="painel-tabela__vazio">Nenhum corretor cadastrado ainda.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = lista.map(c => `
+      <tr>
+        <td>${esc(c.nome)}</td>
+        <td class="col-email">${esc(c.email)}</td>
+        <td>
+          <span class="pp-gestor-situacao pp-gestor-situacao--${esc(c.situacao)}">
+            ${esc(labelSituacaoPP(c.situacao))}
+          </span>
+        </td>
+        <td>
+          <span class="${c.ativo ? 'pp-gestor-ativo' : 'pp-gestor-inativo'}">
+            ${c.ativo ? 'Ativo' : 'Inativo'}
+          </span>
+        </td>
+        <td class="col-data">${esc(formatarData(c.criado_em))}</td>
+        <td class="col-link">
+          <button class="btn-pp-acao btn-pp-acao--toggle"
+                  data-id="${esc(String(c.id))}"
+                  data-ativo="${c.ativo ? '1' : '0'}"
+                  type="button">
+            ${c.ativo ? 'Desativar' : 'Ativar'}
+          </button>
+          <button class="btn-pp-acao btn-pp-acao--excluir"
+                  data-id="${esc(String(c.id))}"
+                  data-nome="${esc(c.nome)}"
+                  type="button">
+            Excluir
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+    tbody.querySelectorAll('.btn-pp-acao--toggle').forEach(btn => {
+      btn.addEventListener('click', () => toggleCorretorPP(
+        parseInt(btn.dataset.id),
+        btn.dataset.ativo === '1'
+      ));
+    });
+
+    tbody.querySelectorAll('.btn-pp-acao--excluir').forEach(btn => {
+      btn.addEventListener('click', () => excluirCorretorPP(
+        parseInt(btn.dataset.id),
+        btn.dataset.nome
+      ));
+    });
+
+  } catch (_) {
+    document.getElementById('tbody-pp').innerHTML =
+      '<tr><td colspan="6" class="painel-tabela__vazio">Erro ao carregar.</td></tr>';
+  }
+}
+
+// ─── Ativar / desativar corretor PP ──────────────────────────────────────────
+async function toggleCorretorPP(id, ativoAtual) {
+  try {
+    const { status, data } = await apiFetch(`/api/gestor/pp/corretores/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ ativo: !ativoAtual })
+    });
+    if (status === 401) { deslogar(); return; }
+    if (status !== 200) { alert(data.erro || 'Erro ao atualizar.'); return; }
+    await carregarPiorPatrao();
+  } catch (_) {
+    alert('Erro de conexão. Tente novamente.');
+  }
+}
+
+// ─── Excluir corretor PP ──────────────────────────────────────────────────────
+async function excluirCorretorPP(id, nome) {
+  if (!confirm(`Deseja excluir permanentemente o corretor "${nome}"?\nTodos os dados financeiros serão apagados.`)) return;
+
+  try {
+    const { status, data } = await apiFetch(`/api/gestor/pp/corretores/${id}`, {
+      method: 'DELETE'
+    });
+    if (status === 401) { deslogar(); return; }
+    if (status !== 200) { alert(data.erro || 'Erro ao excluir.'); return; }
+    await carregarPiorPatrao();
+  } catch (_) {
+    alert('Erro de conexão. Tente novamente.');
+  }
+}
+
+// ─── Modal novo corretor PP ───────────────────────────────────────────────────
+function abrirModalPP() {
+  resetarModalPP();
+  document.getElementById('modal-pp').setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('pp-input-nome').focus(), 50);
+}
+
+function fecharModalPP() {
+  const el = document.getElementById('modal-pp');
+  if (!el) return;
+  el.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+function resetarModalPP() {
+  document.getElementById('modal-pp-corpo').hidden    = false;
+  document.getElementById('modal-pp-resultado').hidden = true;
+  document.getElementById('pp-input-nome').value     = '';
+  document.getElementById('pp-input-email').value    = '';
+  document.getElementById('pp-input-senha').value    = '';
+  document.getElementById('pp-input-situacao').value = 'pleno';
+  document.getElementById('pp-erro-nome').textContent  = '';
+  document.getElementById('pp-erro-email').textContent = '';
+  document.getElementById('pp-erro-senha').textContent = '';
+  const btn = document.getElementById('btn-cadastrar-pp');
+  btn.disabled    = false;
+  btn.textContent = 'Cadastrar';
+}
+
+async function cadastrarCorretorPP() {
+  const nomeEl     = document.getElementById('pp-input-nome');
+  const emailEl    = document.getElementById('pp-input-email');
+  const senhaEl    = document.getElementById('pp-input-senha');
+  const situacaoEl = document.getElementById('pp-input-situacao');
+  const erroNome   = document.getElementById('pp-erro-nome');
+  const erroEmail  = document.getElementById('pp-erro-email');
+  const erroSenha  = document.getElementById('pp-erro-senha');
+  const btnEl      = document.getElementById('btn-cadastrar-pp');
+
+  erroNome.textContent  = '';
+  erroEmail.textContent = '';
+  erroSenha.textContent = '';
+
+  const nome     = nomeEl.value.trim();
+  const email    = emailEl.value.trim();
+  const senha    = senhaEl.value;
+  const situacao = situacaoEl.value;
+
+  let valido = true;
+  if (!nome || nome.length < 3) {
+    erroNome.textContent = 'Nome obrigatório (mínimo 3 caracteres).';
+    nomeEl.focus(); valido = false;
+  }
+  if (!email || !email.includes('@') || !email.includes('.')) {
+    erroEmail.textContent = 'E-mail inválido.';
+    if (valido) { emailEl.focus(); valido = false; }
+  }
+  if (!senha || senha.length < 6) {
+    erroSenha.textContent = 'Senha obrigatória (mínimo 6 caracteres).';
+    if (valido) { senhaEl.focus(); valido = false; }
+  }
+  if (!valido) return;
+
+  btnEl.disabled    = true;
+  btnEl.textContent = 'Cadastrando…';
+
+  try {
+    const { status, data } = await apiFetch('/api/gestor/pp/corretores', {
+      method: 'POST',
+      body: JSON.stringify({ nome, email, senha, situacao })
+    });
+
+    if (status === 401) { deslogar(); return; }
+
+    if (status !== 200 || !data.ok) {
+      erroNome.textContent = data.erro || 'Erro ao cadastrar. Tente novamente.';
+      btnEl.disabled    = false;
+      btnEl.textContent = 'Cadastrar';
+      return;
+    }
+
+    document.getElementById('modal-pp-corpo').hidden    = true;
+    document.getElementById('modal-pp-resultado').hidden = false;
+    await carregarPiorPatrao();
+
+  } catch (_) {
+    erroNome.textContent = 'Erro de conexão. Tente novamente.';
+    btnEl.disabled    = false;
+    btnEl.textContent = 'Cadastrar';
+  }
+}

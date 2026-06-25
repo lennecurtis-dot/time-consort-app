@@ -48,6 +48,9 @@
         <span class="painel-header__subtitulo">Painel do Gestor</span>
       </div>
       <div class="painel-header__acoes">
+        <button class="btn-pior-patrao" id="btn-ir-pp" type="button">
+          Pior Patrão
+        </button>
         <button class="btn-novo-assessment" id="btn-abrir-modal" type="button">
           + Novo Assessment
         </button>
@@ -193,6 +196,105 @@
     <main class="painel-corpo painel-corpo--detalhe">
       <div id="detalhe-relatorio"></div>
     </main>
+  </div>
+
+  <!-- ══ PIOR PATRÃO ════════════════════════════════════════════════════════ -->
+  <div class="painel-view" data-painel-view="pior-patrao" aria-hidden="true">
+    <header class="painel-header">
+      <div class="painel-header__nav">
+        <button class="btn-voltar" id="btn-voltar-pp" type="button">← Painel</button>
+        <span class="painel-header__titulo">Pior Patrão — Corretores</span>
+      </div>
+      <div class="painel-header__acoes">
+        <button class="btn-logout painel-header__btn-sair" type="button">Sair</button>
+      </div>
+    </header>
+
+    <main class="painel-corpo">
+      <div class="painel-secao">
+        <div class="painel-secao__cabecalho">
+          <h2 class="painel-secao__titulo painel-secao__titulo--inline">Corretores cadastrados</h2>
+          <button class="btn-novo-assessment btn-novo-assessment--sm" id="btn-abrir-modal-pp" type="button">
+            + Novo corretor
+          </button>
+        </div>
+
+        <div class="painel-tabela-container">
+          <table class="painel-tabela" aria-label="Corretores Pior Patrão">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th class="col-email">E-mail</th>
+                <th>Situação</th>
+                <th>Status</th>
+                <th class="col-data">Criado em</th>
+                <th class="col-link">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-pp">
+              <tr><td colspan="6" class="painel-tabela__vazio">Carregando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ══ MODAL NOVO CORRETOR PP ══════════════════════════════════════════════ -->
+  <div id="modal-pp" class="modal-overlay" aria-hidden="true"
+       role="dialog" aria-modal="true" aria-labelledby="modal-pp-titulo">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 class="modal-titulo" id="modal-pp-titulo">Novo Corretor — Pior Patrão</h2>
+        <button class="modal-fechar" id="btn-fechar-modal-pp" type="button"
+                aria-label="Fechar modal">✕</button>
+      </div>
+
+      <div class="modal-corpo" id="modal-pp-corpo">
+        <div class="campo-formulario">
+          <label class="campo-formulario__label" for="pp-input-nome">Nome do corretor</label>
+          <input class="campo-formulario__input" type="text" id="pp-input-nome"
+                 autocomplete="name" placeholder="Nome completo" minlength="3"
+                 aria-describedby="pp-erro-nome">
+          <p class="campo-formulario__erro" id="pp-erro-nome" role="alert" aria-live="polite"></p>
+        </div>
+        <div class="campo-formulario">
+          <label class="campo-formulario__label" for="pp-input-email">E-mail</label>
+          <input class="campo-formulario__input" type="email" id="pp-input-email"
+                 autocomplete="off" placeholder="email@exemplo.com"
+                 aria-describedby="pp-erro-email">
+          <p class="campo-formulario__erro" id="pp-erro-email" role="alert" aria-live="polite"></p>
+        </div>
+        <div class="campo-formulario">
+          <label class="campo-formulario__label" for="pp-input-senha">Senha de acesso</label>
+          <input class="campo-formulario__input" type="password" id="pp-input-senha"
+                 autocomplete="new-password" placeholder="Mínimo 6 caracteres"
+                 aria-describedby="pp-erro-senha">
+          <p class="campo-formulario__erro" id="pp-erro-senha" role="alert" aria-live="polite"></p>
+        </div>
+        <div class="campo-formulario">
+          <label class="campo-formulario__label" for="pp-input-situacao">Situação</label>
+          <select class="campo-formulario__input" id="pp-input-situacao">
+            <option value="pleno">Corretor Pleno</option>
+            <option value="estagiario">Estagiário</option>
+          </select>
+        </div>
+        <button class="btn-primario" id="btn-cadastrar-pp" type="button">
+          Cadastrar
+        </button>
+      </div>
+
+      <div class="modal-resultado" id="modal-pp-resultado" hidden>
+        <div class="modal-resultado__icone" aria-hidden="true">✓</div>
+        <p class="modal-resultado__label">Corretor cadastrado com sucesso!</p>
+        <p style="font-size:.875rem;color:#5A6275;margin-bottom:16px;text-align:center;">
+          O corretor já pode acessar o módulo em <strong>/pp</strong> com o e-mail e senha informados.
+        </p>
+        <button class="btn-secundario modal-resultado__btn-novo" id="btn-outro-pp" type="button">
+          Cadastrar outro
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- ══ MODAL NOVO ASSESSMENT ════════════════════════════════════════════════ -->

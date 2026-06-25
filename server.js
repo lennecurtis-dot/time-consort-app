@@ -6,7 +6,12 @@ const express  = require('express');
 const path     = require('path');
 const { calcularResultado } = require('./scoring-engine');
 const { buscarPorCodigo, salvarResultado,
-        criarAssessment, listarConcluidos, buscarAssessmentGestor, obterEstatisticas } = require('./database');
+        criarAssessment, listarConcluidos, buscarAssessmentGestor, obterEstatisticas,
+        pp_criarCorretor, pp_buscarCorretorPorEmail, pp_buscarCorretorPorId,
+        pp_listarCorretores, pp_atualizarCorretor, pp_removerCorretor,
+        pp_obterConfiguracao, pp_salvarConfiguracao,
+        pp_listarVendas, pp_registrarVenda, pp_removerVenda } = require('./database');
+const { calcularMetas, calcularComissao } = require('./pp-engine');
 const questions = require('./questions');
 
 const app  = express();
@@ -272,6 +277,233 @@ app.get('/api/gestor/assessments/:id', autenticacaoGestor, (req, res) => {
     url:          `${getBaseUrl()}/a/${a.codigo}`,
     resultado
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MÓDULO PIOR PATRÃO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Tokens dos corretores PP em memória (igual ao padrão do gestor)
+const _tokensPP = new Map(); // token → corretor_id
+
+function autenticacaoPP(req, res, next) {
+  const header = req.headers['authorization'] || '';
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!token || !_tokensPP.has(token)) {
+    return res.status(401).json({ erro: 'Não autorizado.' });
+  }
+  req.ppCorretorId = _tokensPP.get(token);
+  next();
+}
+
+// Hashing com scrypt (Node.js nativo — sem dependências extras)
+function hashSenha(senha) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(senha, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verificarSenha(senha, armazenado) {
+  const [salt, hash] = armazenado.split(':');
+  const hashTentativa = crypto.scryptSync(senha, salt, 64).toString('hex');
+  const buf1 = Buffer.from(hash,         'hex');
+  const buf2 = Buffer.from(hashTentativa,'hex');
+  return buf1.length === buf2.length && crypto.timingSafeEqual(buf1, buf2);
+}
+
+// GET /pp — serve SPA do módulo
+app.get(['/pp', '/pp/'], (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'pior-patrao', 'index.html'));
+});
+
+// ─── Auth do corretor PP ──────────────────────────────────────────────────────
+app.post('/api/pp/login', (req, res) => {
+  const { email, senha } = req.body || {};
+
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ erro: 'E-mail obrigatório.' });
+  }
+  if (!senha || typeof senha !== 'string') {
+    return res.status(400).json({ erro: 'Senha obrigatória.' });
+  }
+
+  const corretor = pp_buscarCorretorPorEmail(email.trim().toLowerCase());
+  if (!corretor || !verificarSenha(senha, corretor.senha_hash)) {
+    return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  _tokensPP.set(token, corretor.id);
+  return res.json({ ok: true, token, nome: corretor.nome, situacao: corretor.situacao });
+});
+
+app.post('/api/pp/logout', autenticacaoPP, (req, res) => {
+  const header = req.headers['authorization'] || '';
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : '';
+  _tokensPP.delete(token);
+  return res.json({ ok: true });
+});
+
+// ─── Perfil do corretor ───────────────────────────────────────────────────────
+app.get('/api/pp/perfil', autenticacaoPP, (req, res) => {
+  const c = pp_buscarCorretorPorId(req.ppCorretorId);
+  if (!c) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+  return res.json({ id: c.id, nome: c.nome, email: c.email, situacao: c.situacao });
+});
+
+// ─── Configuração financeira ──────────────────────────────────────────────────
+app.get('/api/pp/configuracao', autenticacaoPP, (req, res) => {
+  const cfg = pp_obterConfiguracao(req.ppCorretorId);
+  return res.json(cfg || { custos_fixos: 0, objetivo_anual: 0 });
+});
+
+app.put('/api/pp/configuracao', autenticacaoPP, (req, res) => {
+  const { custos_fixos, objetivo_anual } = req.body || {};
+
+  if (typeof custos_fixos !== 'number' || custos_fixos < 0) {
+    return res.status(400).json({ erro: 'Custos fixos inválidos.' });
+  }
+  if (typeof objetivo_anual !== 'number' || objetivo_anual < 0) {
+    return res.status(400).json({ erro: 'Objetivo anual inválido.' });
+  }
+
+  pp_salvarConfiguracao({ corretor_id: req.ppCorretorId, custos_fixos, objetivo_anual });
+  return res.json({ ok: true });
+});
+
+// ─── Cálculos financeiros ─────────────────────────────────────────────────────
+app.get('/api/pp/calculos', autenticacaoPP, (req, res) => {
+  const corretor = pp_buscarCorretorPorId(req.ppCorretorId);
+  const cfg      = pp_obterConfiguracao(req.ppCorretorId);
+
+  if (!cfg) {
+    return res.json({ configurado: false });
+  }
+
+  const metas = calcularMetas({
+    custos_fixos:   cfg.custos_fixos,
+    objetivo_anual: cfg.objetivo_anual,
+    situacao:       corretor.situacao
+  });
+
+  return res.json({ configurado: true, ...metas });
+});
+
+// ─── Vendas ───────────────────────────────────────────────────────────────────
+app.get('/api/pp/vendas', autenticacaoPP, (req, res) => {
+  const vendas = pp_listarVendas(req.ppCorretorId);
+  return res.json({ items: vendas });
+});
+
+app.post('/api/pp/vendas', autenticacaoPP, (req, res) => {
+  const { descricao, vgv, data_venda } = req.body || {};
+
+  if (typeof vgv !== 'number' || vgv <= 0) {
+    return res.status(400).json({ erro: 'VGV inválido.' });
+  }
+  if (!data_venda || typeof data_venda !== 'string') {
+    return res.status(400).json({ erro: 'Data da venda obrigatória.' });
+  }
+
+  const corretor = pp_buscarCorretorPorId(req.ppCorretorId);
+  const { comissao, dist_reinvestimento, dist_custos, dist_lucro } =
+    calcularComissao({ vgv, situacao: corretor.situacao });
+
+  pp_registrarVenda({
+    corretor_id: req.ppCorretorId,
+    descricao:   typeof descricao === 'string' ? descricao.trim().slice(0, 300) : '',
+    vgv,
+    data_venda,
+    comissao,
+    dist_reinvestimento,
+    dist_custos,
+    dist_lucro
+  });
+
+  return res.json({ ok: true, comissao, dist_reinvestimento, dist_custos, dist_lucro });
+});
+
+app.delete('/api/pp/vendas/:id', autenticacaoPP, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
+
+  const r = pp_removerVenda(id, req.ppCorretorId);
+  if (!r.changes) return res.status(404).json({ erro: 'Venda não encontrada.' });
+  return res.json({ ok: true });
+});
+
+// ─── Gestor: gerenciar corretores PP ─────────────────────────────────────────
+app.get('/api/gestor/pp/corretores', autenticacaoGestor, (_req, res) => {
+  const lista = pp_listarCorretores();
+  return res.json({ items: lista });
+});
+
+app.post('/api/gestor/pp/corretores', autenticacaoGestor, (req, res) => {
+  const { nome, email, senha, situacao } = req.body || {};
+
+  if (!nome || typeof nome !== 'string' || nome.trim().length < 3) {
+    return res.status(400).json({ erro: 'Nome obrigatório (mínimo 3 caracteres).' });
+  }
+  if (!email || typeof email !== 'string' || !email.includes('@') || !email.includes('.')) {
+    return res.status(400).json({ erro: 'E-mail inválido.' });
+  }
+  if (!senha || typeof senha !== 'string' || senha.length < 6) {
+    return res.status(400).json({ erro: 'Senha obrigatória (mínimo 6 caracteres).' });
+  }
+  if (situacao && !['estagiario', 'pleno'].includes(situacao)) {
+    return res.status(400).json({ erro: 'Situação inválida.' });
+  }
+
+  const nomeLimpo  = nome.trim().slice(0, 200);
+  const emailLimpo = email.trim().toLowerCase().slice(0, 200);
+
+  try {
+    const senha_hash = hashSenha(senha);
+    pp_criarCorretor({ nome: nomeLimpo, email: emailLimpo, senha_hash, situacao: situacao || 'pleno' });
+    return res.json({ ok: true });
+  } catch (err) {
+    if (String(err).includes('UNIQUE')) {
+      return res.status(409).json({ erro: 'E-mail já cadastrado.' });
+    }
+    console.error('[pp corretor] Erro ao criar:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.put('/api/gestor/pp/corretores/:id', autenticacaoGestor, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
+
+  const { nome, situacao, ativo, senha } = req.body || {};
+  const campos = {};
+
+  if (nome     !== undefined) campos.nome     = String(nome).trim().slice(0, 200);
+  if (situacao !== undefined) {
+    if (!['estagiario', 'pleno'].includes(situacao)) {
+      return res.status(400).json({ erro: 'Situação inválida.' });
+    }
+    campos.situacao = situacao;
+  }
+  if (ativo !== undefined) campos.ativo = ativo ? 1 : 0;
+  if (senha  !== undefined) {
+    if (typeof senha !== 'string' || senha.length < 6) {
+      return res.status(400).json({ erro: 'Senha mínima de 6 caracteres.' });
+    }
+    campos.senha_hash = hashSenha(senha);
+  }
+
+  const r = pp_atualizarCorretor(id, campos);
+  if (!r) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+  return res.json({ ok: true });
+});
+
+app.delete('/api/gestor/pp/corretores/:id', autenticacaoGestor, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
+
+  const r = pp_removerCorretor(id);
+  if (!r.changes) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+  return res.json({ ok: true });
 });
 
 // ─── 404 JSON para rotas de API desconhecidas ─────────────────────────────────
