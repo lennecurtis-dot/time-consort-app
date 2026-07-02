@@ -38,29 +38,34 @@ app.get('/a/:codigo', (req, res) => {
 });
 
 // ─── API: valida o link do corretor ───────────────────────────────────────────
-app.get('/api/a/:codigo', (req, res) => {
+app.get('/api/a/:codigo', async (req, res) => {
   const { codigo } = req.params;
 
   if (!/^[A-Za-z0-9]{16}$/.test(codigo)) {
     return res.status(404).json({ erro: 'Link inválido.' });
   }
 
-  const assessment = buscarPorCodigo(codigo);
-  if (!assessment) {
-    return res.status(404).json({ erro: 'Link inválido.' });
-  }
-  if (assessment.status === 'expirado') {
-    return res.status(410).json({ erro: 'Este link expirou.' });
-  }
-  if (assessment.status === 'concluido') {
-    return res.status(409).json({ erro: 'Assessment já concluído.' });
-  }
+  try {
+    const assessment = await buscarPorCodigo(codigo);
+    if (!assessment) {
+      return res.status(404).json({ erro: 'Link inválido.' });
+    }
+    if (assessment.status === 'expirado') {
+      return res.status(410).json({ erro: 'Este link expirou.' });
+    }
+    if (assessment.status === 'concluido') {
+      return res.status(409).json({ erro: 'Assessment já concluído.' });
+    }
 
-  return res.json({
-    ok:     true,
-    nome:   assessment.nome,
-    status: assessment.status
-  });
+    return res.json({
+      ok:     true,
+      nome:   assessment.nome,
+      status: assessment.status
+    });
+  } catch (err) {
+    console.error('[validar link] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
 // ─── API: retorna as questões sem pesos (nunca expor pesos ao frontend) ────────
@@ -72,11 +77,10 @@ app.get('/api/questoes', (_req, res) => {
 });
 
 // ─── API: recebe e processa o assessment submetido ────────────────────────────
-app.post('/api/a/:codigo/submit', (req, res) => {
+app.post('/api/a/:codigo/submit', async (req, res) => {
   const { codigo }                = req.params;
   const { dadosPessoais, respostas } = req.body || {};
 
-  // Validações de entrada
   if (!dadosPessoais || typeof dadosPessoais.nome !== 'string' || dadosPessoais.nome.trim().length < 3) {
     return res.status(400).json({ erro: 'Nome obrigatório (mínimo 3 caracteres).' });
   }
@@ -87,7 +91,14 @@ app.post('/api/a/:codigo/submit', (req, res) => {
     return res.status(400).json({ erro: 'Nenhuma resposta recebida.' });
   }
 
-  const assessment = buscarPorCodigo(codigo);
+  let assessment;
+  try {
+    assessment = await buscarPorCodigo(codigo);
+  } catch (err) {
+    console.error('[submit] Erro em buscarPorCodigo:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+
   if (!assessment) {
     return res.status(404).json({ erro: 'Código não encontrado.' });
   }
@@ -120,7 +131,7 @@ app.post('/api/a/:codigo/submit', (req, res) => {
   };
 
   try {
-    salvarResultado(assessment.id, dadosCompletos, respostas);
+    await salvarResultado(assessment.id, dadosCompletos, respostas);
   } catch (errSave) {
     console.error('[submit] Erro em salvarResultado:', errSave);
     return res.status(500).json({ erro: 'Erro interno ao salvar o resultado.' });
@@ -133,7 +144,6 @@ app.post('/api/a/:codigo/submit', (req, res) => {
 // FASE 3 — PAINEL DO GESTOR
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Tokens Bearer em memória — perdidos ao reiniciar o servidor (comportamento esperado)
 const _tokensGestor = new Set();
 
 function autenticacaoGestor(req, res, next) {
@@ -145,12 +155,10 @@ function autenticacaoGestor(req, res, next) {
   next();
 }
 
-// GET /gestor — serve o SPA do painel
 app.get(['/gestor', '/gestor/'], (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'gestor', 'index.html'));
 });
 
-// POST /api/gestor/login
 app.post('/api/gestor/login', (req, res) => {
   const { senha } = req.body || {};
   const senhaGestor = process.env.GESTOR_PASSWORD || '';
@@ -177,20 +185,22 @@ app.post('/api/gestor/login', (req, res) => {
   return res.json({ ok: true, token });
 });
 
-// POST /api/gestor/logout
 app.post('/api/gestor/logout', autenticacaoGestor, (req, res) => {
   const token = (req.headers['authorization'] || '').slice(7);
   _tokensGestor.delete(token);
   return res.json({ ok: true });
 });
 
-// GET /api/gestor/stats
-app.get('/api/gestor/stats', autenticacaoGestor, (_req, res) => {
-  return res.json(obterEstatisticas());
+app.get('/api/gestor/stats', autenticacaoGestor, async (_req, res) => {
+  try {
+    return res.json(await obterEstatisticas());
+  } catch (err) {
+    console.error('[stats] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
-// POST /api/gestor/assessments — cria novo assessment e retorna link
-app.post('/api/gestor/assessments', autenticacaoGestor, (req, res) => {
+app.post('/api/gestor/assessments', autenticacaoGestor, async (req, res) => {
   const { nome, email } = req.body || {};
 
   if (!nome || typeof nome !== 'string' || nome.trim().length < 3) {
@@ -202,10 +212,10 @@ app.post('/api/gestor/assessments', autenticacaoGestor, (req, res) => {
 
   const nomeLimpo  = nome.trim().slice(0, 200);
   const emailLimpo = email.trim().toLowerCase().slice(0, 200);
-  const codigo     = crypto.randomBytes(8).toString('hex'); // 16 chars hex
+  const codigo     = crypto.randomBytes(8).toString('hex');
 
   try {
-    criarAssessment(nomeLimpo, emailLimpo, codigo);
+    await criarAssessment(nomeLimpo, emailLimpo, codigo);
   } catch (err) {
     console.error('[criar assessment] Erro:', err);
     return res.status(500).json({ erro: 'Erro interno ao criar assessment.' });
@@ -214,78 +224,85 @@ app.post('/api/gestor/assessments', autenticacaoGestor, (req, res) => {
   return res.json({ ok: true, codigo, url: `${getBaseUrl()}/a/${codigo}` });
 });
 
-// GET /api/gestor/assessments?q=&pagina=
-app.get('/api/gestor/assessments', autenticacaoGestor, (req, res) => {
+app.get('/api/gestor/assessments', autenticacaoGestor, async (req, res) => {
   const q      = String(req.query.q      || '').trim().slice(0, 100);
   const pagina = Math.max(1, parseInt(req.query.pagina) || 1);
   const limite = 20;
   const offset = (pagina - 1) * limite;
 
-  const { items, total } = listarConcluidos({ search: q, limite, offset });
+  try {
+    const { items, total } = await listarConcluidos({ search: q, limite, offset });
 
-  const lista = items.map(a => {
-    let perfis = null;
-    try {
-      const d = JSON.parse(a.dados_json);
-      perfis = {
-        disc:         d?.perfis?.disc?.label         || null,
-        temperamento: d?.perfis?.temperamento?.label || null,
-        aptidao:      d?.perfis?.aptidao?.label      || null
+    const lista = items.map(a => {
+      let perfis = null;
+      try {
+        const d = JSON.parse(a.dados_json);
+        perfis = {
+          disc:         d?.perfis?.disc?.label         || null,
+          temperamento: d?.perfis?.temperamento?.label || null,
+          aptidao:      d?.perfis?.aptidao?.label      || null
+        };
+      } catch (_) {}
+
+      return {
+        id:           a.id,
+        codigo:       a.codigo,
+        nome:         a.nome,
+        email:        a.email,
+        concluido_em: a.concluido_em,
+        url:          `${getBaseUrl()}/a/${a.codigo}`,
+        perfis
       };
-    } catch (_) {}
+    });
 
-    return {
-      id:           a.id,
-      codigo:       a.codigo,
-      nome:         a.nome,
-      email:        a.email,
-      concluido_em: a.concluido_em,
-      url:          `${getBaseUrl()}/a/${a.codigo}`,
-      perfis
-    };
-  });
-
-  return res.json({
-    items:   lista,
-    total,
-    pagina,
-    limite,
-    paginas: Math.ceil(total / limite) || 1
-  });
+    return res.json({
+      items:   lista,
+      total,
+      pagina,
+      limite,
+      paginas: Math.ceil(total / limite) || 1
+    });
+  } catch (err) {
+    console.error('[listar assessments] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
-// GET /api/gestor/assessments/:id
-app.get('/api/gestor/assessments/:id', autenticacaoGestor, (req, res) => {
+app.get('/api/gestor/assessments/:id', autenticacaoGestor, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id || isNaN(id)) {
     return res.status(400).json({ erro: 'ID inválido.' });
   }
 
-  const a = buscarAssessmentGestor(id);
-  if (!a) return res.status(404).json({ erro: 'Não encontrado.' });
+  try {
+    const a = await buscarAssessmentGestor(id);
+    if (!a) return res.status(404).json({ erro: 'Não encontrado.' });
 
-  let resultado = null;
-  try { resultado = JSON.parse(a.dados_json); } catch (_) {}
+    let resultado = null;
+    try { resultado = JSON.parse(a.dados_json); } catch (_) {}
 
-  return res.json({
-    id:           a.id,
-    codigo:       a.codigo,
-    nome:         a.nome,
-    email:        a.email,
-    status:       a.status,
-    criado_em:    a.criado_em,
-    concluido_em: a.concluido_em,
-    url:          `${getBaseUrl()}/a/${a.codigo}`,
-    resultado
-  });
+    return res.json({
+      id:           a.id,
+      codigo:       a.codigo,
+      nome:         a.nome,
+      email:        a.email,
+      status:       a.status,
+      criado_em:    a.criado_em,
+      concluido_em: a.concluido_em,
+      url:          `${getBaseUrl()}/a/${a.codigo}`,
+      resultado
+    });
+  } catch (err) {
+    console.error('[detalhe assessment] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MÓDULO PIOR PATRÃO
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Tokens dos corretores PP em memória (igual ao padrão do gestor)
-const _tokensPP = new Map(); // token → corretor_id
+const _tokensPP = new Map();
 
 function autenticacaoPP(req, res, next) {
   const header = req.headers['authorization'] || '';
@@ -297,7 +314,6 @@ function autenticacaoPP(req, res, next) {
   next();
 }
 
-// Hashing com scrypt (Node.js nativo — sem dependências extras)
 function hashSenha(senha) {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.scryptSync(senha, salt, 64).toString('hex');
@@ -312,13 +328,11 @@ function verificarSenha(senha, armazenado) {
   return buf1.length === buf2.length && crypto.timingSafeEqual(buf1, buf2);
 }
 
-// GET /pp — serve SPA do módulo
 app.get(['/pp', '/pp/'], (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'pior-patrao', 'index.html'));
 });
 
-// ─── Auth do corretor PP ──────────────────────────────────────────────────────
-app.post('/api/pp/login', (req, res) => {
+app.post('/api/pp/login', async (req, res) => {
   const { email, senha } = req.body || {};
 
   if (!email || typeof email !== 'string') {
@@ -328,14 +342,19 @@ app.post('/api/pp/login', (req, res) => {
     return res.status(400).json({ erro: 'Senha obrigatória.' });
   }
 
-  const corretor = pp_buscarCorretorPorEmail(email.trim().toLowerCase());
-  if (!corretor || !verificarSenha(senha, corretor.senha_hash)) {
-    return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
-  }
+  try {
+    const corretor = await pp_buscarCorretorPorEmail(email.trim().toLowerCase());
+    if (!corretor || !verificarSenha(senha, corretor.senha_hash)) {
+      return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
+    }
 
-  const token = crypto.randomBytes(32).toString('hex');
-  _tokensPP.set(token, corretor.id);
-  return res.json({ ok: true, token, nome: corretor.nome, situacao: corretor.situacao });
+    const token = crypto.randomBytes(32).toString('hex');
+    _tokensPP.set(token, corretor.id);
+    return res.json({ ok: true, token, nome: corretor.nome, situacao: corretor.situacao });
+  } catch (err) {
+    console.error('[pp login] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
 app.post('/api/pp/logout', autenticacaoPP, (req, res) => {
@@ -345,20 +364,28 @@ app.post('/api/pp/logout', autenticacaoPP, (req, res) => {
   return res.json({ ok: true });
 });
 
-// ─── Perfil do corretor ───────────────────────────────────────────────────────
-app.get('/api/pp/perfil', autenticacaoPP, (req, res) => {
-  const c = pp_buscarCorretorPorId(req.ppCorretorId);
-  if (!c) return res.status(404).json({ erro: 'Corretor não encontrado.' });
-  return res.json({ id: c.id, nome: c.nome, email: c.email, situacao: c.situacao });
+app.get('/api/pp/perfil', autenticacaoPP, async (req, res) => {
+  try {
+    const c = await pp_buscarCorretorPorId(req.ppCorretorId);
+    if (!c) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+    return res.json({ id: c.id, nome: c.nome, email: c.email, situacao: c.situacao });
+  } catch (err) {
+    console.error('[pp perfil] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
-// ─── Configuração financeira ──────────────────────────────────────────────────
-app.get('/api/pp/configuracao', autenticacaoPP, (req, res) => {
-  const cfg = pp_obterConfiguracao(req.ppCorretorId);
-  return res.json(cfg || { custos_fixos: 0, objetivo_anual: 0 });
+app.get('/api/pp/configuracao', autenticacaoPP, async (req, res) => {
+  try {
+    const cfg = await pp_obterConfiguracao(req.ppCorretorId);
+    return res.json(cfg || { custos_fixos: 0, objetivo_anual: 0 });
+  } catch (err) {
+    console.error('[pp configuracao get] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
-app.put('/api/pp/configuracao', autenticacaoPP, (req, res) => {
+app.put('/api/pp/configuracao', autenticacaoPP, async (req, res) => {
   const { custos_fixos, objetivo_anual } = req.body || {};
 
   if (typeof custos_fixos !== 'number' || custos_fixos < 0) {
@@ -368,35 +395,48 @@ app.put('/api/pp/configuracao', autenticacaoPP, (req, res) => {
     return res.status(400).json({ erro: 'Objetivo anual inválido.' });
   }
 
-  pp_salvarConfiguracao({ corretor_id: req.ppCorretorId, custos_fixos, objetivo_anual });
-  return res.json({ ok: true });
-});
-
-// ─── Cálculos financeiros ─────────────────────────────────────────────────────
-app.get('/api/pp/calculos', autenticacaoPP, (req, res) => {
-  const corretor = pp_buscarCorretorPorId(req.ppCorretorId);
-  const cfg      = pp_obterConfiguracao(req.ppCorretorId);
-
-  if (!cfg) {
-    return res.json({ configurado: false });
+  try {
+    await pp_salvarConfiguracao({ corretor_id: req.ppCorretorId, custos_fixos, objetivo_anual });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[pp configuracao put] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
   }
-
-  const metas = calcularMetas({
-    custos_fixos:   cfg.custos_fixos,
-    objetivo_anual: cfg.objetivo_anual,
-    situacao:       corretor.situacao
-  });
-
-  return res.json({ configurado: true, ...metas });
 });
 
-// ─── Vendas ───────────────────────────────────────────────────────────────────
-app.get('/api/pp/vendas', autenticacaoPP, (req, res) => {
-  const vendas = pp_listarVendas(req.ppCorretorId);
-  return res.json({ items: vendas });
+app.get('/api/pp/calculos', autenticacaoPP, async (req, res) => {
+  try {
+    const corretor = await pp_buscarCorretorPorId(req.ppCorretorId);
+    const cfg      = await pp_obterConfiguracao(req.ppCorretorId);
+
+    if (!cfg) {
+      return res.json({ configurado: false });
+    }
+
+    const metas = calcularMetas({
+      custos_fixos:   cfg.custos_fixos,
+      objetivo_anual: cfg.objetivo_anual,
+      situacao:       corretor.situacao
+    });
+
+    return res.json({ configurado: true, ...metas });
+  } catch (err) {
+    console.error('[pp calculos] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
-app.post('/api/pp/vendas', autenticacaoPP, (req, res) => {
+app.get('/api/pp/vendas', autenticacaoPP, async (req, res) => {
+  try {
+    const vendas = await pp_listarVendas(req.ppCorretorId);
+    return res.json({ items: vendas });
+  } catch (err) {
+    console.error('[pp vendas get] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.post('/api/pp/vendas', autenticacaoPP, async (req, res) => {
   const { descricao, vgv, data_venda } = req.body || {};
 
   if (typeof vgv !== 'number' || vgv <= 0) {
@@ -406,40 +446,54 @@ app.post('/api/pp/vendas', autenticacaoPP, (req, res) => {
     return res.status(400).json({ erro: 'Data da venda obrigatória.' });
   }
 
-  const corretor = pp_buscarCorretorPorId(req.ppCorretorId);
-  const { comissao, dist_reinvestimento, dist_custos, dist_lucro } =
-    calcularComissao({ vgv, situacao: corretor.situacao });
+  try {
+    const corretor = await pp_buscarCorretorPorId(req.ppCorretorId);
+    const { comissao, dist_reinvestimento, dist_custos, dist_lucro } =
+      calcularComissao({ vgv, situacao: corretor.situacao });
 
-  pp_registrarVenda({
-    corretor_id: req.ppCorretorId,
-    descricao:   typeof descricao === 'string' ? descricao.trim().slice(0, 300) : '',
-    vgv,
-    data_venda,
-    comissao,
-    dist_reinvestimento,
-    dist_custos,
-    dist_lucro
-  });
+    await pp_registrarVenda({
+      corretor_id: req.ppCorretorId,
+      descricao:   typeof descricao === 'string' ? descricao.trim().slice(0, 300) : '',
+      vgv,
+      data_venda,
+      comissao,
+      dist_reinvestimento,
+      dist_custos,
+      dist_lucro
+    });
 
-  return res.json({ ok: true, comissao, dist_reinvestimento, dist_custos, dist_lucro });
+    return res.json({ ok: true, comissao, dist_reinvestimento, dist_custos, dist_lucro });
+  } catch (err) {
+    console.error('[pp venda post] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
-app.delete('/api/pp/vendas/:id', autenticacaoPP, (req, res) => {
+app.delete('/api/pp/vendas/:id', autenticacaoPP, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
 
-  const r = pp_removerVenda(id, req.ppCorretorId);
-  if (!r.changes) return res.status(404).json({ erro: 'Venda não encontrada.' });
-  return res.json({ ok: true });
+  try {
+    const r = await pp_removerVenda(id, req.ppCorretorId);
+    if (!r.rowsAffected) return res.status(404).json({ erro: 'Venda não encontrada.' });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[pp venda delete] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
-// ─── Gestor: gerenciar corretores PP ─────────────────────────────────────────
-app.get('/api/gestor/pp/corretores', autenticacaoGestor, (_req, res) => {
-  const lista = pp_listarCorretores();
-  return res.json({ items: lista });
+app.get('/api/gestor/pp/corretores', autenticacaoGestor, async (_req, res) => {
+  try {
+    const lista = await pp_listarCorretores();
+    return res.json({ items: lista });
+  } catch (err) {
+    console.error('[pp corretores get] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
-app.post('/api/gestor/pp/corretores', autenticacaoGestor, (req, res) => {
+app.post('/api/gestor/pp/corretores', autenticacaoGestor, async (req, res) => {
   const { nome, email, senha, situacao } = req.body || {};
 
   if (!nome || typeof nome !== 'string' || nome.trim().length < 3) {
@@ -460,7 +514,7 @@ app.post('/api/gestor/pp/corretores', autenticacaoGestor, (req, res) => {
 
   try {
     const senha_hash = hashSenha(senha);
-    pp_criarCorretor({ nome: nomeLimpo, email: emailLimpo, senha_hash, situacao: situacao || 'pleno' });
+    await pp_criarCorretor({ nome: nomeLimpo, email: emailLimpo, senha_hash, situacao: situacao || 'pleno' });
     return res.json({ ok: true });
   } catch (err) {
     if (String(err).includes('UNIQUE')) {
@@ -471,7 +525,7 @@ app.post('/api/gestor/pp/corretores', autenticacaoGestor, (req, res) => {
   }
 });
 
-app.put('/api/gestor/pp/corretores/:id', autenticacaoGestor, (req, res) => {
+app.put('/api/gestor/pp/corretores/:id', autenticacaoGestor, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
 
@@ -493,18 +547,28 @@ app.put('/api/gestor/pp/corretores/:id', autenticacaoGestor, (req, res) => {
     campos.senha_hash = hashSenha(senha);
   }
 
-  const r = pp_atualizarCorretor(id, campos);
-  if (!r) return res.status(404).json({ erro: 'Corretor não encontrado.' });
-  return res.json({ ok: true });
+  try {
+    const r = await pp_atualizarCorretor(id, campos);
+    if (!r) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[pp corretor put] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
-app.delete('/api/gestor/pp/corretores/:id', autenticacaoGestor, (req, res) => {
+app.delete('/api/gestor/pp/corretores/:id', autenticacaoGestor, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
 
-  const r = pp_removerCorretor(id);
-  if (!r.changes) return res.status(404).json({ erro: 'Corretor não encontrado.' });
-  return res.json({ ok: true });
+  try {
+    const r = await pp_removerCorretor(id);
+    if (!r.rowsAffected) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[pp corretor delete] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
 });
 
 // ─── 404 JSON para rotas de API desconhecidas ─────────────────────────────────
