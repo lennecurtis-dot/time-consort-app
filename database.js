@@ -12,6 +12,10 @@ const STATUS_VALIDOS = ['pendente', 'em_andamento', 'concluido', 'expirado'];
 
 let _schemaPronto = null;
 
+async function _tentarAlterTable(sql) {
+  try { await client.execute(sql); } catch (_) { /* coluna já existe — ignora */ }
+}
+
 function garantirSchema() {
   if (_schemaPronto) return _schemaPronto;
   _schemaPronto = (async () => {
@@ -75,6 +79,10 @@ function garantirSchema() {
     for (const sql of statements) {
       await client.execute(sql);
     }
+
+    // Migração: novas colunas para itens dinâmicos (custos e objetivos discriminados)
+    await _tentarAlterTable(`ALTER TABLE pp_configuracao ADD COLUMN custos_itens TEXT`);
+    await _tentarAlterTable(`ALTER TABLE pp_configuracao ADD COLUMN objetivos_itens TEXT`);
   })();
   return _schemaPronto;
 }
@@ -209,6 +217,17 @@ async function pp_buscarCorretorPorEmail(email) {
   return r.rows[0] || null;
 }
 
+// Busca sem exigir "ativo" — usada para linkar com o Assessment mesmo se o
+// corretor tiver sido desativado depois.
+async function pp_buscarCorretorPorEmailQualquerStatus(email) {
+  await garantirSchema();
+  const r = await client.execute({
+    sql: 'SELECT * FROM pp_corretores WHERE email = ?',
+    args: [email]
+  });
+  return r.rows[0] || null;
+}
+
 async function pp_buscarCorretorPorId(id) {
   await garantirSchema();
   const r = await client.execute({
@@ -257,17 +276,21 @@ async function pp_obterConfiguracao(corretor_id) {
   return r.rows[0] || null;
 }
 
-async function pp_salvarConfiguracao({ corretor_id, custos_fixos, objetivo_anual }) {
+// custosItens / objetivosItens: array de { nome, valor } — salvos como JSON
+async function pp_salvarConfiguracao({ corretor_id, custosItens, objetivosItens }) {
   await garantirSchema();
   const agora = new Date().toISOString();
+  const custosJson    = JSON.stringify(custosItens    || []);
+  const objetivosJson = JSON.stringify(objetivosItens || []);
+
   return client.execute({
-    sql: `INSERT INTO pp_configuracao (corretor_id, custos_fixos, objetivo_anual, atualizado_em)
-          VALUES (?, ?, ?, ?)
+    sql: `INSERT INTO pp_configuracao (corretor_id, custos_fixos, objetivo_anual, custos_itens, objetivos_itens, atualizado_em)
+          VALUES (?, 0, 0, ?, ?, ?)
           ON CONFLICT(corretor_id) DO UPDATE SET
-            custos_fixos   = excluded.custos_fixos,
-            objetivo_anual = excluded.objetivo_anual,
-            atualizado_em  = excluded.atualizado_em`,
-    args: [corretor_id, custos_fixos, objetivo_anual, agora]
+            custos_itens     = excluded.custos_itens,
+            objetivos_itens  = excluded.objetivos_itens,
+            atualizado_em    = excluded.atualizado_em`,
+    args: [corretor_id, custosJson, objetivosJson, agora]
   });
 }
 
@@ -305,7 +328,8 @@ module.exports = {
   STATUS_VALIDOS,
   buscarPorCodigo, salvarResultado,
   criarAssessment, listarConcluidos, buscarAssessmentGestor, obterEstatisticas,
-  pp_criarCorretor, pp_buscarCorretorPorEmail, pp_buscarCorretorPorId,
+  pp_criarCorretor, pp_buscarCorretorPorEmail, pp_buscarCorretorPorEmailQualquerStatus,
+  pp_buscarCorretorPorId,
   pp_listarCorretores, pp_atualizarCorretor, pp_removerCorretor,
   pp_obterConfiguracao, pp_salvarConfiguracao,
   pp_listarVendas, pp_registrarVenda, pp_removerVenda
