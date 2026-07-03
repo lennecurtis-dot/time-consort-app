@@ -7,7 +7,8 @@ const path     = require('path');
 const { calcularResultado } = require('./scoring-engine');
 const { buscarPorCodigo, salvarResultado,
         criarAssessment, listarConcluidos, buscarAssessmentGestor, obterEstatisticas,
-        pp_criarCorretor, pp_buscarCorretorPorEmail, pp_buscarCorretorPorId,
+        pp_criarCorretor, pp_buscarCorretorPorEmail, pp_buscarCorretorPorEmailQualquerStatus,
+        pp_buscarCorretorPorId,
         pp_listarCorretores, pp_atualizarCorretor, pp_removerCorretor,
         pp_obterConfiguracao, pp_salvarConfiguracao,
         pp_listarVendas, pp_registrarVenda, pp_removerVenda } = require('./database');
@@ -20,6 +21,14 @@ const PORT = process.env.PORT || 3000;
 function getBaseUrl() {
   const base = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
   return base || `http://localhost:${PORT}`;
+}
+
+function parseItensJson(str) {
+  if (!str) return [];
+  try {
+    const arr = JSON.parse(str);
+    return Array.isArray(arr) ? arr : [];
+  } catch (_) { return []; }
 }
 
 // ─── Middleware ────────────────────────────────────────────────────────────────
@@ -268,6 +277,7 @@ app.get('/api/gestor/assessments', autenticacaoGestor, async (req, res) => {
   }
 });
 
+// ─── Detalhe do assessment — agora enriquecido com dados do Pior Patrão ───────
 app.get('/api/gestor/assessments/:id', autenticacaoGestor, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id || isNaN(id)) {
@@ -281,6 +291,47 @@ app.get('/api/gestor/assessments/:id', autenticacaoGestor, async (req, res) => {
     let resultado = null;
     try { resultado = JSON.parse(a.dados_json); } catch (_) {}
 
+    // ── Vínculo por e-mail com o módulo Pior Patrão ──────────────────────────
+    let piorPatrao = null;
+    try {
+      const corretorPP = await pp_buscarCorretorPorEmailQualquerStatus(
+        (a.email || '').trim().toLowerCase()
+      );
+
+      if (corretorPP) {
+        const cfg = await pp_obterConfiguracao(corretorPP.id);
+        const vendas = await pp_listarVendas(corretorPP.id);
+
+        let metas = null;
+        if (cfg && (cfg.custos_itens || cfg.objetivos_itens)) {
+          metas = calcularMetas({
+            custosItens:    parseItensJson(cfg.custos_itens),
+            objetivosItens: parseItensJson(cfg.objetivos_itens),
+            situacao:       corretorPP.situacao
+          });
+        }
+
+        const vgvTotal      = vendas.reduce((s, v) => s + v.vgv,      0);
+        const comissaoTotal = vendas.reduce((s, v) => s + v.comissao, 0);
+
+        piorPatrao = {
+          cadastrado:    true,
+          nome:          corretorPP.nome,
+          situacao:      corretorPP.situacao,
+          ativo:         !!corretorPP.ativo,
+          configurado:   !!metas,
+          metas,
+          custosItens:    cfg ? parseItensJson(cfg.custos_itens)    : [],
+          objetivosItens: cfg ? parseItensJson(cfg.objetivos_itens) : [],
+          totalVendas:    vendas.length,
+          vgvTotal:       vgvTotal,
+          comissaoTotal:  comissaoTotal
+        };
+      }
+    } catch (errPP) {
+      console.error('[detalhe assessment] Erro ao buscar Pior Patrão:', errPP);
+    }
+
     return res.json({
       id:           a.id,
       codigo:       a.codigo,
@@ -290,7 +341,8 @@ app.get('/api/gestor/assessments/:id', autenticacaoGestor, async (req, res) => {
       criado_em:    a.criado_em,
       concluido_em: a.concluido_em,
       url:          `${getBaseUrl()}/a/${a.codigo}`,
-      resultado
+      resultado,
+      piorPatrao
     });
   } catch (err) {
     console.error('[detalhe assessment] Erro:', err);
@@ -378,7 +430,10 @@ app.get('/api/pp/perfil', autenticacaoPP, async (req, res) => {
 app.get('/api/pp/configuracao', autenticacaoPP, async (req, res) => {
   try {
     const cfg = await pp_obterConfiguracao(req.ppCorretorId);
-    return res.json(cfg || { custos_fixos: 0, objetivo_anual: 0 });
+    return res.json({
+      custosItens:    cfg ? parseItensJson(cfg.custos_itens)    : [],
+      objetivosItens: cfg ? parseItensJson(cfg.objetivos_itens) : []
+    });
   } catch (err) {
     console.error('[pp configuracao get] Erro:', err);
     return res.status(500).json({ erro: 'Erro interno.' });
@@ -386,17 +441,28 @@ app.get('/api/pp/configuracao', autenticacaoPP, async (req, res) => {
 });
 
 app.put('/api/pp/configuracao', autenticacaoPP, async (req, res) => {
-  const { custos_fixos, objetivo_anual } = req.body || {};
+  const { custosItens, objetivosItens } = req.body || {};
 
-  if (typeof custos_fixos !== 'number' || custos_fixos < 0) {
-    return res.status(400).json({ erro: 'Custos fixos inválidos.' });
+  if (!Array.isArray(custosItens) || !Array.isArray(objetivosItens)) {
+    return res.status(400).json({ erro: 'Formato inválido.' });
   }
-  if (typeof objetivo_anual !== 'number' || objetivo_anual < 0) {
-    return res.status(400).json({ erro: 'Objetivo anual inválido.' });
-  }
+
+  const limparItens = (lista) => lista
+    .map(it => ({
+      nome:  typeof it.nome === 'string' ? it.nome.trim().slice(0, 100) : '',
+      valor: Number(it.valor)
+    }))
+    .filter(it => it.nome && !isNaN(it.valor) && it.valor >= 0);
+
+  const custosLimpos    = limparItens(custosItens);
+  const objetivosLimpos = limparItens(objetivosItens);
 
   try {
-    await pp_salvarConfiguracao({ corretor_id: req.ppCorretorId, custos_fixos, objetivo_anual });
+    await pp_salvarConfiguracao({
+      corretor_id:    req.ppCorretorId,
+      custosItens:    custosLimpos,
+      objetivosItens: objetivosLimpos
+    });
     return res.json({ ok: true });
   } catch (err) {
     console.error('[pp configuracao put] Erro:', err);
@@ -409,14 +475,17 @@ app.get('/api/pp/calculos', autenticacaoPP, async (req, res) => {
     const corretor = await pp_buscarCorretorPorId(req.ppCorretorId);
     const cfg      = await pp_obterConfiguracao(req.ppCorretorId);
 
-    if (!cfg) {
+    const custosItens    = cfg ? parseItensJson(cfg.custos_itens)    : [];
+    const objetivosItens = cfg ? parseItensJson(cfg.objetivos_itens) : [];
+
+    if (!custosItens.length && !objetivosItens.length) {
       return res.json({ configurado: false });
     }
 
     const metas = calcularMetas({
-      custos_fixos:   cfg.custos_fixos,
-      objetivo_anual: cfg.objetivo_anual,
-      situacao:       corretor.situacao
+      custosItens,
+      objetivosItens,
+      situacao: corretor.situacao
     });
 
     return res.json({ configurado: true, ...metas });
