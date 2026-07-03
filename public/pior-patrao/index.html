@@ -60,34 +60,48 @@
 
     <main class="pp-corpo">
       <div class="pp-secao">
-        <h2 class="pp-secao__titulo">Configure seu planejamento</h2>
-        <p class="pp-secao__desc">Informe seus dados financeiros para calcular suas metas.</p>
+        <h2 class="pp-secao__titulo">Custos mensais</h2>
+        <p class="pp-secao__desc">Anote cada despesa fixa separadamente (água, energia, mercado, internet, etc). Adicione quantas precisar.</p>
 
-        <div class="pp-form-cfg">
-          <div class="pp-campo">
-            <label class="pp-campo__label" for="cfg-custos">Custos fixos mensais (R$)</label>
-            <input class="pp-campo__input" type="number" id="cfg-custos"
-                   min="0" step="0.01" placeholder="Ex: 5000.00"
-                   aria-describedby="cfg-erro-custos">
-            <p class="pp-campo__erro" id="cfg-erro-custos" role="alert" aria-live="polite"></p>
-          </div>
-          <div class="pp-campo">
-            <label class="pp-campo__label" for="cfg-objetivo">Objetivo financeiro — próximos 12 meses (R$)</label>
-            <input class="pp-campo__input" type="number" id="cfg-objetivo"
-                   min="0" step="0.01" placeholder="Ex: 120000.00"
-                   aria-describedby="cfg-erro-objetivo">
-            <p class="pp-campo__erro" id="cfg-erro-objetivo" role="alert" aria-live="polite"></p>
-          </div>
+        <div id="lista-custos" class="pp-itens-lista"></div>
 
-          <div class="pp-situacao-info">
-            <span class="pp-situacao-badge" id="cfg-situacao-badge"></span>
-            <span class="pp-situacao-texto" id="cfg-situacao-texto"></span>
-          </div>
+        <button class="pp-btn-secondary pp-btn-add-item" id="btn-add-custo" type="button">
+          + Adicionar despesa
+        </button>
 
-          <button class="pp-btn-primario" id="btn-salvar-cfg" type="button">
-            Calcular metas
-          </button>
+        <div class="pp-itens-total">
+          <span>Soma dos custos mensais</span>
+          <strong id="total-custos-soma">R$ 0,00</strong>
         </div>
+      </div>
+
+      <div class="pp-secao">
+        <h2 class="pp-secao__titulo">Objetivos — próximos 12 meses</h2>
+        <p class="pp-secao__desc">Anote cada sonho ou meta separadamente (trocar de carro, entrada do imóvel, viagem, etc). Adicione quantos precisar.</p>
+
+        <div id="lista-objetivos" class="pp-itens-lista"></div>
+
+        <button class="pp-btn-secondary pp-btn-add-item" id="btn-add-objetivo" type="button">
+          + Adicionar objetivo
+        </button>
+
+        <div class="pp-itens-total">
+          <span>Soma dos objetivos</span>
+          <strong id="total-objetivos-soma">R$ 0,00</strong>
+        </div>
+      </div>
+
+      <div class="pp-secao">
+        <div class="pp-situacao-info">
+          <span class="pp-situacao-badge" id="cfg-situacao-badge"></span>
+          <span class="pp-situacao-texto" id="cfg-situacao-texto"></span>
+        </div>
+
+        <p class="pp-campo__erro" id="cfg-erro-geral" role="alert" aria-live="polite"></p>
+
+        <button class="pp-btn-primario" id="btn-salvar-cfg" type="button">
+          Calcular metas
+        </button>
       </div>
     </main>
   </div>
@@ -115,6 +129,25 @@
     </nav>
 
     <main class="pp-corpo">
+      <!-- Resumo dos custos e objetivos -->
+      <div class="pp-secao">
+        <h2 class="pp-secao__titulo">Resumo do planejamento</h2>
+        <div class="pp-metas-grid">
+          <div class="pp-meta-card">
+            <span class="pp-meta-card__rotulo">Custos mensais (+30%)</span>
+            <span class="pp-meta-card__valor" id="resumo-custo-mensal">—</span>
+          </div>
+          <div class="pp-meta-card">
+            <span class="pp-meta-card__rotulo">Custos anuais (× 12)</span>
+            <span class="pp-meta-card__valor" id="resumo-custo-anual">—</span>
+          </div>
+          <div class="pp-meta-card">
+            <span class="pp-meta-card__rotulo">Objetivos (+30%)</span>
+            <span class="pp-meta-card__valor" id="resumo-objetivo-total">—</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Metas financeiras -->
       <div class="pp-secao">
         <div class="pp-secao__cabecalho">
