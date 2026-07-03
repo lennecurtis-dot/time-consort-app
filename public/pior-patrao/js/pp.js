@@ -8,7 +8,9 @@ const state = {
   nome:     sessionStorage.getItem('pp_nome')   || '',
   situacao: sessionStorage.getItem('pp_sit')    || 'pleno',
   viewAtual: null,
-  vendas:   []
+  vendas:   [],
+  custosItens:    [],
+  objetivosItens: []
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -137,7 +139,7 @@ function atualizarNomesHeader() {
   document.getElementById('header-nome-dash').textContent = state.nome;
 }
 
-// ─── View: Configuração ────────────────────────────────────────────────────────
+// ─── View: Configuração — Custos e Objetivos dinâmicos ─────────────────────────
 async function carregarConfiguracaoView() {
   navegarPara('configuracao');
 
@@ -149,39 +151,114 @@ async function carregarConfiguracaoView() {
     ? 'Sua taxa de comissão é 1,034% do VGV.'
     : 'Sua taxa de comissão é 2,068% do VGV.';
 
-  // Pré-carregar valores existentes se houver
   try {
     const { data } = await apiFetch('/api/pp/configuracao');
-    if (data.custos_fixos   > 0) document.getElementById('cfg-custos').value   = data.custos_fixos;
-    if (data.objetivo_anual > 0) document.getElementById('cfg-objetivo').value = data.objetivo_anual;
-  } catch (_) {}
+    state.custosItens    = (data.custosItens    && data.custosItens.length)    ? data.custosItens    : [{ nome: '', valor: '' }];
+    state.objetivosItens = (data.objetivosItens && data.objetivosItens.length) ? data.objetivosItens : [{ nome: '', valor: '' }];
+  } catch (_) {
+    state.custosItens    = [{ nome: '', valor: '' }];
+    state.objetivosItens = [{ nome: '', valor: '' }];
+  }
+
+  renderizarItens('custos');
+  renderizarItens('objetivos');
+}
+
+function renderizarItens(tipo) {
+  const container = document.getElementById(tipo === 'custos' ? 'lista-custos' : 'lista-objetivos');
+  const itens      = tipo === 'custos' ? state.custosItens : state.objetivosItens;
+  const placeholderNome = tipo === 'custos' ? 'Ex: Água, Energia, Internet…' : 'Ex: Trocar de carro, Entrada do imóvel…';
+
+  container.innerHTML = itens.map((item, i) => `
+    <div class="pp-item-row" data-index="${i}">
+      <input class="pp-campo__input pp-item-row__nome" type="text"
+             placeholder="${placeholderNome}" maxlength="100"
+             value="${esc(item.nome)}" data-tipo="${tipo}" data-campo="nome" data-index="${i}">
+      <input class="pp-campo__input pp-item-row__valor" type="number"
+             min="0" step="0.01" placeholder="R$ 0,00"
+             value="${esc(item.valor)}" data-tipo="${tipo}" data-campo="valor" data-index="${i}">
+      <button class="pp-btn-remove-item" type="button"
+              data-tipo="${tipo}" data-index="${i}"
+              aria-label="Remover item" ${itens.length <= 1 ? 'disabled' : ''}>✕</button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('input').forEach(input => {
+    input.addEventListener('input', onItemInputChange);
+  });
+  container.querySelectorAll('.pp-btn-remove-item').forEach(btn => {
+    btn.addEventListener('click', () => removerItem(btn.dataset.tipo, parseInt(btn.dataset.index)));
+  });
+
+  atualizarSomaExibida(tipo);
+}
+
+function onItemInputChange(e) {
+  const { tipo, campo, index } = e.target.dataset;
+  const itens = tipo === 'custos' ? state.custosItens : state.objetivosItens;
+  const i     = parseInt(index);
+  if (!itens[i]) return;
+
+  itens[i][campo] = campo === 'valor' ? e.target.value : e.target.value;
+
+  // Auto-adiciona nova linha vazia quando o usuário começa a preencher a última
+  const ultima = itens[itens.length - 1];
+  if (ultima.nome.trim() !== '' || String(ultima.valor).trim() !== '') {
+    itens.push({ nome: '', valor: '' });
+    renderizarItens(tipo);
+    // Mantém o foco no campo que o usuário estava editando
+    setTimeout(() => {
+      const seletor = `[data-tipo="${tipo}"][data-campo="${campo}"][data-index="${i}"]`;
+      const el = document.querySelector(seletor);
+      if (el) { el.focus(); el.setSelectionRange?.(el.value.length, el.value.length); }
+    }, 0);
+    return;
+  }
+
+  atualizarSomaExibida(tipo);
+}
+
+function removerItem(tipo, index) {
+  const itens = tipo === 'custos' ? state.custosItens : state.objetivosItens;
+  if (itens.length <= 1) return;
+  itens.splice(index, 1);
+  renderizarItens(tipo);
+}
+
+function somarItensValidos(itens) {
+  return itens.reduce((s, item) => {
+    const v = parseFloat(item.valor);
+    return s + (isNaN(v) ? 0 : v);
+  }, 0);
+}
+
+function atualizarSomaExibida(tipo) {
+  const itens = tipo === 'custos' ? state.custosItens : state.objetivosItens;
+  const soma  = somarItensValidos(itens);
+  const alvo  = document.getElementById(tipo === 'custos' ? 'total-custos-soma' : 'total-objetivos-soma');
+  if (alvo) alvo.textContent = brl(soma);
 }
 
 async function salvarConfiguracao() {
-  const custosEl   = document.getElementById('cfg-custos');
-  const objetivoEl = document.getElementById('cfg-objetivo');
-  const erroCustos   = document.getElementById('cfg-erro-custos');
-  const erroObjetivo = document.getElementById('cfg-erro-objetivo');
-  const btnEl        = document.getElementById('btn-salvar-cfg');
+  const erroEl = document.getElementById('cfg-erro-geral');
+  const btnEl  = document.getElementById('btn-salvar-cfg');
+  erroEl.textContent = '';
 
-  erroCustos.textContent   = '';
-  erroObjetivo.textContent = '';
+  const limpar = (itens) => itens
+    .map(it => ({ nome: (it.nome || '').trim(), valor: parseFloat(it.valor) }))
+    .filter(it => it.nome && !isNaN(it.valor) && it.valor >= 0);
 
-  const custos   = parseFloat(custosEl.value);
-  const objetivo = parseFloat(objetivoEl.value);
-  let valido = true;
+  const custosLimpos    = limpar(state.custosItens);
+  const objetivosLimpos = limpar(state.objetivosItens);
 
-  if (isNaN(custos) || custos < 0) {
-    erroCustos.textContent = 'Informe um valor válido (≥ 0).';
-    custosEl.focus();
-    valido = false;
+  if (!custosLimpos.length) {
+    erroEl.textContent = 'Adicione pelo menos um custo mensal com nome e valor.';
+    return;
   }
-  if (isNaN(objetivo) || objetivo < 0) {
-    erroObjetivo.textContent = 'Informe um valor válido (≥ 0).';
-    if (valido) objetivoEl.focus();
-    valido = false;
+  if (!objetivosLimpos.length) {
+    erroEl.textContent = 'Adicione pelo menos um objetivo com nome e valor.';
+    return;
   }
-  if (!valido) return;
 
   btnEl.disabled    = true;
   btnEl.textContent = 'Salvando…';
@@ -189,18 +266,18 @@ async function salvarConfiguracao() {
   try {
     const { status, data } = await apiFetch('/api/pp/configuracao', {
       method: 'PUT',
-      body: JSON.stringify({ custos_fixos: custos, objetivo_anual: objetivo })
+      body: JSON.stringify({ custosItens: custosLimpos, objetivosItens: objetivosLimpos })
     });
     if (verificarSessaoExpirada(status)) return;
 
     if (status !== 200 || !data.ok) {
-      erroCustos.textContent = data.erro || 'Erro ao salvar. Tente novamente.';
+      erroEl.textContent = data.erro || 'Erro ao salvar. Tente novamente.';
       return;
     }
 
     await carregarDashboard();
   } catch (_) {
-    erroCustos.textContent = 'Erro de conexão. Tente novamente.';
+    erroEl.textContent = 'Erro de conexão. Tente novamente.';
   } finally {
     btnEl.disabled    = false;
     btnEl.textContent = 'Calcular metas';
@@ -224,6 +301,10 @@ async function carregarDashboard() {
     if (verificarSessaoExpirada(status)) return;
 
     if (data.configurado) {
+      document.getElementById('resumo-custo-mensal').textContent   = brl(data.custoMensalTotal);
+      document.getElementById('resumo-custo-anual').textContent    = brl(data.custoAnualTotal);
+      document.getElementById('resumo-objetivo-total').textContent = brl(data.objetivoTotal);
+
       document.getElementById('meta-anual').textContent   = brl(data.ganhoAnual);
       document.getElementById('meta-mensal').textContent  = brl(data.ganhoMensal);
       document.getElementById('meta-semanal').textContent = brl(data.ganhoSemanal);
@@ -381,7 +462,6 @@ function abrirModalVenda() {
   overlay.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
 
-  // Preencher data de hoje por padrão
   const hoje = new Date().toISOString().split('T')[0];
   document.getElementById('venda-data').value = hoje;
 
@@ -457,7 +537,6 @@ async function registrarVenda() {
       return;
     }
 
-    // Mostrar resultado
     document.getElementById('modal-venda-form').hidden     = true;
     document.getElementById('modal-venda-resultado').hidden = false;
     document.getElementById('modal-venda-detalhe').innerHTML = `
@@ -478,7 +557,6 @@ async function registrarVenda() {
       </div>
     `;
 
-    // Atualizar dados locais
     await carregarResumoVendas();
   } catch (_) {
     erroVgv.textContent = 'Erro de conexão. Tente novamente.';
@@ -490,7 +568,6 @@ async function registrarVenda() {
 // ─── Inicialização ─────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
 
-  // Login
   document.getElementById('btn-entrar').addEventListener('click', login);
   document.getElementById('input-senha').addEventListener('keydown', e => {
     if (e.key === 'Enter') login();
@@ -499,41 +576,47 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') document.getElementById('input-senha').focus();
   });
 
-  // Logout
   document.getElementById('btn-logout-cfg').addEventListener('click', deslogar);
   document.getElementById('btn-logout-dash').addEventListener('click', deslogar);
   document.getElementById('btn-logout-vendas').addEventListener('click', deslogar);
 
-  // Configuração
+  document.getElementById('btn-add-custo').addEventListener('click', () => {
+    state.custosItens.push({ nome: '', valor: '' });
+    renderizarItens('custos');
+    const inputs = document.querySelectorAll('#lista-custos .pp-item-row__nome');
+    inputs[inputs.length - 1]?.focus();
+  });
+
+  document.getElementById('btn-add-objetivo').addEventListener('click', () => {
+    state.objetivosItens.push({ nome: '', valor: '' });
+    renderizarItens('objetivos');
+    const inputs = document.querySelectorAll('#lista-objetivos .pp-item-row__nome');
+    inputs[inputs.length - 1]?.focus();
+  });
+
   document.getElementById('btn-salvar-cfg').addEventListener('click', salvarConfiguracao);
 
-  // Nav — dashboard
   document.getElementById('nav-dashboard').addEventListener('click', () => carregarDashboard());
   document.getElementById('nav-vendas').addEventListener('click',    () => carregarVendas());
   document.getElementById('nav-config').addEventListener('click',    () => carregarConfiguracaoView());
 
-  // Nav — vendas
   document.getElementById('nav-dashboard-v').addEventListener('click', () => carregarDashboard());
   document.getElementById('nav-vendas-v').addEventListener('click',    () => carregarVendas());
   document.getElementById('nav-config-v').addEventListener('click',    () => carregarConfiguracaoView());
 
-  // Nova venda
   document.getElementById('btn-nova-venda-dash').addEventListener('click', abrirModalVenda);
   document.getElementById('btn-nova-venda').addEventListener('click',      abrirModalVenda);
 
-  // Modal venda — fechar
   document.getElementById('btn-fechar-modal-venda').addEventListener('click', fecharModalVenda);
   document.getElementById('modal-venda').addEventListener('click', e => {
     if (e.target === e.currentTarget) fecharModalVenda();
   });
 
-  // Modal venda — registrar
   document.getElementById('btn-salvar-venda').addEventListener('click', registrarVenda);
   document.getElementById('venda-data').addEventListener('keydown', e => {
     if (e.key === 'Enter') registrarVenda();
   });
 
-  // Modal venda — outra / concluir
   document.getElementById('btn-outra-venda').addEventListener('click', () => {
     resetarModalVenda();
     const hoje = new Date().toISOString().split('T')[0];
@@ -549,12 +632,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Escape fecha modal
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') fecharModalVenda();
   });
 
-  // Sessão ativa ao abrir
   if (state.token) {
     iniciarSessao();
   } else {
