@@ -304,6 +304,8 @@ async function carregarDashboard() {
       document.getElementById('resumo-custo-mensal').textContent   = brl(data.custoMensalTotal);
       document.getElementById('resumo-custo-anual').textContent    = brl(data.custoAnualTotal);
       document.getElementById('resumo-objetivo-total').textContent = brl(data.objetivoTotal);
+      document.getElementById('resumo-soma-total').textContent     = brl(data.ganhoAnual);
+      document.getElementById('resumo-dividido-12').textContent    = brl(data.ganhoMensal);
 
       document.getElementById('meta-anual').textContent   = brl(data.ganhoAnual);
       document.getElementById('meta-mensal').textContent  = brl(data.ganhoMensal);
