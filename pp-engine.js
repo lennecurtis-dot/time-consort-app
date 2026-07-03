@@ -15,45 +15,59 @@ const REGRAS = {
   }
 };
 
-const TAXA_PLENO      = REGRAS.TAXA_COMISSAO_CHEIA * REGRAS.PARTICIPACAO_CORRETOR;    // 0.02068
-const TAXA_ESTAGIARIO = TAXA_PLENO * REGRAS.PARTICIPACAO_ESTAGIARIO;                  // 0.01034
+const TAXA_PLENO      = REGRAS.TAXA_COMISSAO_CHEIA * REGRAS.PARTICIPACAO_CORRETOR;
+const TAXA_ESTAGIARIO = TAXA_PLENO * REGRAS.PARTICIPACAO_ESTAGIARIO;
 
 function taxaPorSituacao(situacao) {
   return situacao === 'estagiario' ? TAXA_ESTAGIARIO : TAXA_PLENO;
 }
 
-// ─── Cálculo de metas financeiras ────────────────────────────────────────────
-function calcularMetas({ custos_fixos, objetivo_anual, situacao }) {
-  const custosAnuais  = custos_fixos * 12;
-  const baseAnual     = custosAnuais + objetivo_anual;
-  const ganhoAnual    = baseAnual * REGRAS.FATOR_PRESERVACAO;
+function somarItens(itens) {
+  if (!Array.isArray(itens)) return 0;
+  return itens.reduce((s, item) => {
+    const v = Number(item?.valor);
+    return s + (isNaN(v) ? 0 : v);
+  }, 0);
+}
 
+function calcularMetas({ custosItens = [], objetivosItens = [], situacao }) {
+  const somaCustos   = somarItens(custosItens);
+  const custoMensalTotal = somaCustos * REGRAS.FATOR_PRESERVACAO;
+  const custoAnualTotal  = custoMensalTotal * 12;
+
+  const somaObjetivos = somarItens(objetivosItens);
+  const objetivoTotal  = somaObjetivos * REGRAS.FATOR_PRESERVACAO;
+
+  const ganhoAnual    = custoAnualTotal + objetivoTotal;
   const ganhoMensal   = ganhoAnual / 12;
   const ganhoSemanal  = ganhoAnual / 52;
   const ganhoDiario   = ganhoAnual / (52 * 5);
   const ganhoPorHora  = ganhoAnual / REGRAS.HORAS_UTEIS_ANO;
 
   const taxa            = taxaPorSituacao(situacao);
-  const vgvNecessario   = ganhoAnual / taxa;
-
-  const vgvPleno        = ganhoAnual / TAXA_PLENO;
-  const vgvEstagiario   = ganhoAnual / TAXA_ESTAGIARIO;
+  const vgvNecessario    = ganhoAnual / taxa;
+  const vgvPleno         = ganhoAnual / TAXA_PLENO;
+  const vgvEstagiario    = ganhoAnual / TAXA_ESTAGIARIO;
 
   return {
-    ganhoAnual:       r2(ganhoAnual),
-    ganhoMensal:      r2(ganhoMensal),
-    ganhoSemanal:     r2(ganhoSemanal),
-    ganhoDiario:      r2(ganhoDiario),
-    ganhoPorHora:     r2(ganhoPorHora),
-    vgvNecessario:    r2(vgvNecessario),
-    vgvPleno:         r2(vgvPleno),
-    vgvEstagiario:    r2(vgvEstagiario),
-    taxaAplicada:     taxa,
+    somaCustos:        r2(somaCustos),
+    custoMensalTotal:  r2(custoMensalTotal),
+    custoAnualTotal:   r2(custoAnualTotal),
+    somaObjetivos:     r2(somaObjetivos),
+    objetivoTotal:     r2(objetivoTotal),
+    ganhoAnual:        r2(ganhoAnual),
+    ganhoMensal:       r2(ganhoMensal),
+    ganhoSemanal:      r2(ganhoSemanal),
+    ganhoDiario:       r2(ganhoDiario),
+    ganhoPorHora:      r2(ganhoPorHora),
+    vgvNecessario:     r2(vgvNecessario),
+    vgvPleno:          r2(vgvPleno),
+    vgvEstagiario:     r2(vgvEstagiario),
+    taxaAplicada:      taxa,
     situacao
   };
 }
 
-// ─── Cálculo de comissão por venda ───────────────────────────────────────────
 function calcularComissao({ vgv, situacao }) {
   const taxa       = taxaPorSituacao(situacao);
   const comissao   = vgv * taxa;
