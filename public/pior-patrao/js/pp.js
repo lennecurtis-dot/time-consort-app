@@ -41,7 +41,6 @@ function labelSituacao(s) {
 }
 
 // ─── Máscara de dinheiro ───────────────────────────────────────────────────────
-// Preenche da direita pra esquerda: digitar "1" "2" "3" "4" "5" vira R$ 123,45
 function aplicarMascaraMoeda(inputEl) {
   const raw = inputEl.value.replace(/\D/g, '');
   if (!raw) { inputEl.value = ''; return ''; }
@@ -228,7 +227,6 @@ function onItemInputChange(e) {
     itens[i][campo] = e.target.value;
   }
 
-  // Auto-adiciona nova linha vazia quando o usuário começa a preencher a última
   const ultima = itens[itens.length - 1];
   const ultimaTemNome  = ultima.nome.trim() !== '';
   const ultimaTemValor = ultima.valor !== '' && ultima.valor !== null && ultima.valor !== undefined;
@@ -340,12 +338,12 @@ async function carregarDashboard() {
       document.getElementById('meta-semanal').textContent = brl(data.ganhoSemanal);
       document.getElementById('meta-diario').textContent  = brl(data.ganhoDiario);
       document.getElementById('meta-hora').textContent    = brl(data.ganhoPorHora);
-    document.getElementById('vgv-pleno').textContent      = brl(data.vgvPleno);
+      document.getElementById('vgv-pleno').textContent      = brl(data.vgvPleno);
       document.getElementById('vgv-estagiario').textContent = brl(data.vgvEstagiario);
 
       const mostrarPleno = state.situacao !== 'estagiario';
-      document.getElementById('vgv-card-pleno').hidden      = !mostrarPleno;
-      document.getElementById('vgv-card-estagiario').hidden = mostrarPleno;
+      document.getElementById('vgv-card-pleno').style.display      = mostrarPleno ? '' : 'none';
+      document.getElementById('vgv-card-estagiario').style.display = mostrarPleno ? 'none' : '';
     }
   } catch (_) {}
 
