@@ -340,8 +340,12 @@ async function carregarDashboard() {
       document.getElementById('meta-semanal').textContent = brl(data.ganhoSemanal);
       document.getElementById('meta-diario').textContent  = brl(data.ganhoDiario);
       document.getElementById('meta-hora').textContent    = brl(data.ganhoPorHora);
-      document.getElementById('vgv-pleno').textContent      = brl(data.vgvPleno);
+    document.getElementById('vgv-pleno').textContent      = brl(data.vgvPleno);
       document.getElementById('vgv-estagiario').textContent = brl(data.vgvEstagiario);
+
+      const mostrarPleno = state.situacao !== 'estagiario';
+      document.getElementById('vgv-card-pleno').hidden      = !mostrarPleno;
+      document.getElementById('vgv-card-estagiario').hidden = mostrarPleno;
     }
   } catch (_) {}
 
