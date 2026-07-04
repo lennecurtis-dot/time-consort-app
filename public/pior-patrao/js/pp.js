@@ -40,6 +40,21 @@ function labelSituacao(s) {
   return s === 'estagiario' ? 'Estagiário' : 'Corretor Pleno';
 }
 
+// ─── Máscara de dinheiro ───────────────────────────────────────────────────────
+// Preenche da direita pra esquerda: digitar "1" "2" "3" "4" "5" vira R$ 123,45
+function aplicarMascaraMoeda(inputEl) {
+  const raw = inputEl.value.replace(/\D/g, '');
+  if (!raw) { inputEl.value = ''; return ''; }
+  const numero = parseInt(raw, 10) / 100;
+  inputEl.value = brl(numero);
+  return numero;
+}
+
+function lerValorMoeda(inputEl) {
+  const raw = inputEl.value.replace(/\D/g, '');
+  return raw ? parseInt(raw, 10) / 100 : NaN;
+}
+
 // ─── Navegação ─────────────────────────────────────────────────────────────────
 function navegarPara(viewId) {
   document.querySelectorAll('.pp-view').forEach(el => {
@@ -169,21 +184,29 @@ function renderizarItens(tipo) {
   const itens      = tipo === 'custos' ? state.custosItens : state.objetivosItens;
   const placeholderNome = tipo === 'custos' ? 'Ex: Água, Energia, Internet…' : 'Ex: Trocar de carro, Entrada do imóvel…';
 
-  container.innerHTML = itens.map((item, i) => `
+  container.innerHTML = itens.map((item, i) => {
+    const valorFormatado = (item.valor !== '' && item.valor !== null && item.valor !== undefined)
+      ? brl(item.valor)
+      : '';
+    return `
     <div class="pp-item-row" data-index="${i}">
       <input class="pp-campo__input pp-item-row__nome" type="text"
              placeholder="${placeholderNome}" maxlength="100"
              value="${esc(item.nome)}" data-tipo="${tipo}" data-campo="nome" data-index="${i}">
-      <input class="pp-campo__input pp-item-row__valor" type="number"
-             min="0" step="0.01" placeholder="R$ 0,00"
-             value="${esc(item.valor)}" data-tipo="${tipo}" data-campo="valor" data-index="${i}">
+      <input class="pp-campo__input pp-item-row__valor" type="text" inputmode="numeric"
+             placeholder="R$ 0,00"
+             value="${esc(valorFormatado)}" data-tipo="${tipo}" data-campo="valor" data-index="${i}">
       <button class="pp-btn-remove-item" type="button"
               data-tipo="${tipo}" data-index="${i}"
               aria-label="Remover item" ${itens.length <= 1 ? 'disabled' : ''}>✕</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
-  container.querySelectorAll('input').forEach(input => {
+  container.querySelectorAll('.pp-item-row__valor').forEach(input => {
+    input.addEventListener('input', onItemInputChange);
+  });
+  container.querySelectorAll('.pp-item-row__nome').forEach(input => {
     input.addEventListener('input', onItemInputChange);
   });
   container.querySelectorAll('.pp-btn-remove-item').forEach(btn => {
@@ -199,14 +222,20 @@ function onItemInputChange(e) {
   const i     = parseInt(index);
   if (!itens[i]) return;
 
-  itens[i][campo] = campo === 'valor' ? e.target.value : e.target.value;
+  if (campo === 'valor') {
+    itens[i].valor = aplicarMascaraMoeda(e.target);
+  } else {
+    itens[i][campo] = e.target.value;
+  }
 
   // Auto-adiciona nova linha vazia quando o usuário começa a preencher a última
   const ultima = itens[itens.length - 1];
-  if (ultima.nome.trim() !== '' || String(ultima.valor).trim() !== '') {
+  const ultimaTemNome  = ultima.nome.trim() !== '';
+  const ultimaTemValor = ultima.valor !== '' && ultima.valor !== null && ultima.valor !== undefined;
+
+  if (ultimaTemNome || ultimaTemValor) {
     itens.push({ nome: '', valor: '' });
     renderizarItens(tipo);
-    // Mantém o foco no campo que o usuário estava editando
     setTimeout(() => {
       const seletor = `[data-tipo="${tipo}"][data-campo="${campo}"][data-index="${i}"]`;
       const el = document.querySelector(seletor);
@@ -295,7 +324,6 @@ async function carregarDashboard() {
   badge.textContent      = labelSituacao(state.situacao);
   badge.dataset.situacao = state.situacao;
 
-  // Metas
   try {
     const { status, data } = await apiFetch('/api/pp/calculos');
     if (verificarSessaoExpirada(status)) return;
@@ -317,7 +345,6 @@ async function carregarDashboard() {
     }
   } catch (_) {}
 
-  // Vendas resumo
   await carregarResumoVendas();
 }
 
@@ -501,7 +528,7 @@ async function registrarVenda() {
   erroVgv.textContent  = '';
   erroData.textContent = '';
 
-  const vgv  = parseFloat(vgvEl.value);
+  const vgv  = lerValorMoeda(vgvEl);
   const data = dataEl.value;
   let valido = true;
 
@@ -613,6 +640,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('modal-venda').addEventListener('click', e => {
     if (e.target === e.currentTarget) fecharModalVenda();
   });
+
+  document.getElementById('venda-vgv').addEventListener('input', e => aplicarMascaraMoeda(e.target));
 
   document.getElementById('btn-salvar-venda').addEventListener('click', registrarVenda);
   document.getElementById('venda-data').addEventListener('keydown', e => {
