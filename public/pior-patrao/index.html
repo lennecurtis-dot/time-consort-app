@@ -1,4 +1,135 @@
-<!-- Resumo dos custos e objetivos -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#071A3D">
+  <title>Pior Patrão — TIME CONSORT</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="stylesheet" href="css/pp.css">
+</head>
+<body>
+<div id="pp-app">
+
+  <!-- ══ LOGIN ═══════════════════════════════════════════════════════════════ -->
+  <div class="pp-view" data-pp-view="login" aria-hidden="false">
+    <div class="pp-login-container">
+      <div class="pp-login-box">
+        <div class="pp-logo" role="img" aria-label="TIME CONSORT">
+          <svg viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <polygon points="0,20 8,10 16,20 8,30" fill="#D4AF37"/>
+            <text x="24" y="27" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#071A3D" font-weight="bold" letter-spacing="1.5">TIME CONSORT</text>
+          </svg>
+        </div>
+        <h1 class="pp-login-titulo">Pior Patrão</h1>
+        <p class="pp-login-subtitulo">Planejamento Financeiro</p>
+        <div class="pp-campo">
+          <label class="pp-campo__label" for="input-email">E-mail</label>
+          <input class="pp-campo__input" type="email" id="input-email"
+                 autocomplete="email" placeholder="seu@email.com"
+                 aria-describedby="erro-login">
+        </div>
+        <div class="pp-campo">
+          <label class="pp-campo__label" for="input-senha">Senha</label>
+          <input class="pp-campo__input" type="password" id="input-senha"
+                 autocomplete="current-password" placeholder="••••••••"
+                 aria-describedby="erro-login">
+          <p class="pp-campo__erro" id="erro-login" role="alert" aria-live="polite"></p>
+        </div>
+        <button class="pp-btn-primario" id="btn-entrar" type="button">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CONFIGURAÇÃO ════════════════════════════════════════════════════════ -->
+  <div class="pp-view" data-pp-view="configuracao" aria-hidden="true">
+    <header class="pp-header">
+      <div class="pp-header__logo">
+        <svg viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <polygon points="0,20 8,10 16,20 8,30" fill="#D4AF37"/>
+          <text x="24" y="27" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#ffffff" font-weight="bold" letter-spacing="1.5">TIME CONSORT</text>
+        </svg>
+        <span class="pp-header__subtitulo">Pior Patrão</span>
+      </div>
+      <div class="pp-header__acoes">
+        <span class="pp-header__nome" id="header-nome-cfg"></span>
+        <button class="pp-btn-logout" id="btn-logout-cfg" type="button">Sair</button>
+      </div>
+    </header>
+
+    <main class="pp-corpo">
+      <div class="pp-secao">
+        <h2 class="pp-secao__titulo">Custos mensais</h2>
+        <p class="pp-secao__desc">Anote cada despesa fixa separadamente (água, energia, mercado, internet, etc). Adicione quantas precisar.</p>
+
+        <div id="lista-custos" class="pp-itens-lista"></div>
+
+        <button class="pp-btn-secondary pp-btn-add-item" id="btn-add-custo" type="button">
+          + Adicionar despesa
+        </button>
+
+        <div class="pp-itens-total">
+          <span>Soma dos custos mensais</span>
+          <strong id="total-custos-soma">R$ 0,00</strong>
+        </div>
+      </div>
+
+      <div class="pp-secao">
+        <h2 class="pp-secao__titulo">Objetivos — próximos 12 meses</h2>
+        <p class="pp-secao__desc">Anote cada sonho ou meta separadamente (trocar de carro, entrada do imóvel, viagem, etc). Adicione quantos precisar.</p>
+
+        <div id="lista-objetivos" class="pp-itens-lista"></div>
+
+        <button class="pp-btn-secondary pp-btn-add-item" id="btn-add-objetivo" type="button">
+          + Adicionar objetivo
+        </button>
+
+        <div class="pp-itens-total">
+          <span>Soma dos objetivos</span>
+          <strong id="total-objetivos-soma">R$ 0,00</strong>
+        </div>
+      </div>
+
+      <div class="pp-secao">
+        <div class="pp-situacao-info">
+          <span class="pp-situacao-badge" id="cfg-situacao-badge"></span>
+          <span class="pp-situacao-texto" id="cfg-situacao-texto"></span>
+        </div>
+
+        <p class="pp-campo__erro" id="cfg-erro-geral" role="alert" aria-live="polite"></p>
+
+        <button class="pp-btn-primario" id="btn-salvar-cfg" type="button">
+          Calcular metas
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <!-- ══ DASHBOARD ═══════════════════════════════════════════════════════════ -->
+  <div class="pp-view" data-pp-view="dashboard" aria-hidden="true">
+    <header class="pp-header">
+      <div class="pp-header__logo">
+        <svg viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <polygon points="0,20 8,10 16,20 8,30" fill="#D4AF37"/>
+          <text x="24" y="27" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#ffffff" font-weight="bold" letter-spacing="1.5">TIME CONSORT</text>
+        </svg>
+        <span class="pp-header__subtitulo">Pior Patrão</span>
+      </div>
+      <div class="pp-header__acoes">
+        <span class="pp-header__nome" id="header-nome-dash"></span>
+        <button class="pp-btn-sair-sm" id="btn-logout-dash" type="button">Sair</button>
+      </div>
+    </header>
+
+    <nav class="pp-nav">
+      <button class="pp-nav__btn pp-nav__btn--ativo" id="nav-dashboard" type="button">Dashboard</button>
+      <button class="pp-nav__btn" id="nav-vendas" type="button">Minhas Vendas</button>
+      <button class="pp-nav__btn" id="nav-config" type="button">Configurar</button>
+    </nav>
+
+    <main class="pp-corpo">
+      <!-- Resumo dos custos e objetivos -->
       <div class="pp-secao">
         <h2 class="pp-secao__titulo">Resumo do planejamento</h2>
         <div class="pp-metas-grid">
@@ -24,3 +155,191 @@
           </div>
         </div>
       </div>
+
+      <!-- Metas financeiras -->
+      <div class="pp-secao">
+        <div class="pp-secao__cabecalho">
+          <h2 class="pp-secao__titulo">Suas metas financeiras</h2>
+          <span class="pp-situacao-badge pp-situacao-badge--sm" id="dash-situacao-badge"></span>
+        </div>
+
+        <div class="pp-metas-grid">
+          <div class="pp-meta-card pp-meta-card--destaque">
+            <span class="pp-meta-card__rotulo">Ganho necessário / ano</span>
+            <span class="pp-meta-card__valor" id="meta-anual">—</span>
+          </div>
+          <div class="pp-meta-card">
+            <span class="pp-meta-card__rotulo">/ mês</span>
+            <span class="pp-meta-card__valor" id="meta-mensal">—</span>
+          </div>
+          <div class="pp-meta-card">
+            <span class="pp-meta-card__rotulo">/ semana</span>
+            <span class="pp-meta-card__valor" id="meta-semanal">—</span>
+          </div>
+          <div class="pp-meta-card">
+            <span class="pp-meta-card__rotulo">/ dia</span>
+            <span class="pp-meta-card__valor" id="meta-diario">—</span>
+          </div>
+          <div class="pp-meta-card">
+            <span class="pp-meta-card__rotulo">/ hora</span>
+            <span class="pp-meta-card__valor" id="meta-hora">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- VGV necessário -->
+      <div class="pp-secao">
+        <h2 class="pp-secao__titulo">VGV necessário</h2>
+        <div class="pp-vgv-grid">
+          <div class="pp-vgv-card">
+            <span class="pp-vgv-card__tipo">Como Corretor Pleno</span>
+            <span class="pp-vgv-card__taxa">comissão 2,068% do VGV</span>
+            <span class="pp-vgv-card__valor" id="vgv-pleno">—</span>
+          </div>
+          <div class="pp-vgv-card">
+            <span class="pp-vgv-card__tipo">Como Estagiário</span>
+            <span class="pp-vgv-card__taxa">comissão 1,034% do VGV</span>
+            <span class="pp-vgv-card__valor" id="vgv-estagiario">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumo de vendas -->
+      <div class="pp-secao">
+        <div class="pp-secao__cabecalho">
+          <h2 class="pp-secao__titulo">Resumo de vendas</h2>
+          <button class="pp-btn-secondary" id="btn-nova-venda-dash" type="button">
+            + Registrar venda
+          </button>
+        </div>
+        <div class="pp-resumo-grid" id="resumo-vendas">
+          <div class="pp-resumo-card">
+            <span class="pp-resumo-card__rotulo">Total de vendas</span>
+            <span class="pp-resumo-card__valor" id="resumo-total-vendas">—</span>
+          </div>
+          <div class="pp-resumo-card">
+            <span class="pp-resumo-card__rotulo">VGV total</span>
+            <span class="pp-resumo-card__valor" id="resumo-vgv-total">—</span>
+          </div>
+          <div class="pp-resumo-card">
+            <span class="pp-resumo-card__rotulo">Comissão total</span>
+            <span class="pp-resumo-card__valor" id="resumo-comissao-total">—</span>
+          </div>
+        </div>
+
+        <!-- Distribuição 30/30/40 -->
+        <div class="pp-distribuicao" id="pp-distribuicao">
+          <h3 class="pp-distribuicao__titulo">Distribuição educativa da comissão total</h3>
+          <div class="pp-dist-grid">
+            <div class="pp-dist-item pp-dist-item--reinvestimento">
+              <span class="pp-dist-item__pct">30%</span>
+              <span class="pp-dist-item__nome">Reinvestimento</span>
+              <span class="pp-dist-item__valor" id="dist-reinvestimento">—</span>
+            </div>
+            <div class="pp-dist-item pp-dist-item--custos">
+              <span class="pp-dist-item__pct">30%</span>
+              <span class="pp-dist-item__nome">Custos</span>
+              <span class="pp-dist-item__valor" id="dist-custos">—</span>
+            </div>
+            <div class="pp-dist-item pp-dist-item--lucro">
+              <span class="pp-dist-item__pct">40%</span>
+              <span class="pp-dist-item__nome">Lucro</span>
+              <span class="pp-dist-item__valor" id="dist-lucro">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ══ VENDAS ══════════════════════════════════════════════════════════════ -->
+  <div class="pp-view" data-pp-view="vendas" aria-hidden="true">
+    <header class="pp-header">
+      <div class="pp-header__logo">
+        <svg viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <polygon points="0,20 8,10 16,20 8,30" fill="#D4AF37"/>
+          <text x="24" y="27" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#ffffff" font-weight="bold" letter-spacing="1.5">TIME CONSORT</text>
+        </svg>
+        <span class="pp-header__subtitulo">Pior Patrão</span>
+      </div>
+      <div class="pp-header__acoes">
+        <button class="pp-btn-sair-sm" id="btn-logout-vendas" type="button">Sair</button>
+      </div>
+    </header>
+
+    <nav class="pp-nav">
+      <button class="pp-nav__btn" id="nav-dashboard-v" type="button">Dashboard</button>
+      <button class="pp-nav__btn pp-nav__btn--ativo" id="nav-vendas-v" type="button">Minhas Vendas</button>
+      <button class="pp-nav__btn" id="nav-config-v" type="button">Configurar</button>
+    </nav>
+
+    <main class="pp-corpo">
+      <div class="pp-secao">
+        <div class="pp-secao__cabecalho">
+          <h2 class="pp-secao__titulo">Minhas Vendas</h2>
+          <button class="pp-btn-secondary" id="btn-nova-venda" type="button">
+            + Nova venda
+          </button>
+        </div>
+
+        <div id="lista-vendas-container">
+          <p class="pp-vazio">Carregando…</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ══ MODAL NOVA VENDA ════════════════════════════════════════════════════ -->
+  <div id="modal-venda" class="pp-modal-overlay" aria-hidden="true"
+       role="dialog" aria-modal="true" aria-labelledby="modal-venda-titulo">
+    <div class="pp-modal-box">
+      <div class="pp-modal-header">
+        <h2 class="pp-modal-titulo" id="modal-venda-titulo">Registrar Venda</h2>
+        <button class="pp-modal-fechar" id="btn-fechar-modal-venda" type="button"
+                aria-label="Fechar">✕</button>
+      </div>
+
+      <div class="pp-modal-corpo" id="modal-venda-form">
+        <div class="pp-campo">
+          <label class="pp-campo__label" for="venda-descricao">Descrição (opcional)</label>
+          <input class="pp-campo__input" type="text" id="venda-descricao"
+                 placeholder="Ex: Apto 3 quartos Bairro X" maxlength="300">
+        </div>
+        <div class="pp-campo">
+          <label class="pp-campo__label" for="venda-vgv">VGV da venda (R$)</label>
+          <input class="pp-campo__input" type="number" id="venda-vgv"
+                 min="0.01" step="0.01" placeholder="Ex: 800000.00"
+                 aria-describedby="venda-erro-vgv">
+          <p class="pp-campo__erro" id="venda-erro-vgv" role="alert" aria-live="polite"></p>
+        </div>
+        <div class="pp-campo">
+          <label class="pp-campo__label" for="venda-data">Data da venda</label>
+          <input class="pp-campo__input" type="date" id="venda-data"
+                 aria-describedby="venda-erro-data">
+          <p class="pp-campo__erro" id="venda-erro-data" role="alert" aria-live="polite"></p>
+        </div>
+        <button class="pp-btn-primario" id="btn-salvar-venda" type="button">
+          Registrar
+        </button>
+      </div>
+
+      <!-- Preview do resultado após cálculo -->
+      <div class="pp-modal-resultado" id="modal-venda-resultado" hidden>
+        <div class="pp-modal-resultado__icone" aria-hidden="true">✓</div>
+        <p class="pp-modal-resultado__label">Venda registrada!</p>
+        <div class="pp-modal-resultado__detalhe" id="modal-venda-detalhe"></div>
+        <button class="pp-btn-secondary pp-modal-resultado__btn-nova" id="btn-outra-venda" type="button">
+          Registrar outra
+        </button>
+        <button class="pp-btn-primario pp-modal-resultado__btn-ok" id="btn-ok-venda" type="button">
+          Concluir
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#pp-app -->
+
+<script src="js/pp.js"></script>
+</body>
+</html>
