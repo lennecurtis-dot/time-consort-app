@@ -46,7 +46,7 @@ function garantirSchema() {
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         nome       TEXT    NOT NULL,
         email      TEXT    NOT NULL UNIQUE,
-        senha_hash TEXT    NOT NULL,
+        senha_hash TEXT,
         situacao   TEXT    NOT NULL DEFAULT 'pleno'
                    CHECK (situacao IN ('estagiario', 'pleno')),
         ativo      INTEGER NOT NULL DEFAULT 1,
@@ -80,9 +80,11 @@ function garantirSchema() {
       await client.execute(sql);
     }
 
-    // Migração: novas colunas para itens dinâmicos (custos e objetivos discriminados)
     await _tentarAlterTable(`ALTER TABLE pp_configuracao ADD COLUMN custos_itens TEXT`);
     await _tentarAlterTable(`ALTER TABLE pp_configuracao ADD COLUMN objetivos_itens TEXT`);
+    await _tentarAlterTable(`ALTER TABLE pp_corretores ADD COLUMN setup_token TEXT`);
+    await _tentarAlterTable(`ALTER TABLE pp_corretores ADD COLUMN setup_token_exp TEXT`);
+    await _tentarAlterTable(`CREATE INDEX IF NOT EXISTS idx_pp_corretores_setup_token ON pp_corretores(setup_token)`);
   })();
   return _schemaPronto;
 }
@@ -200,11 +202,38 @@ async function obterEstatisticas() {
   };
 }
 
-async function pp_criarCorretor({ nome, email, senha_hash, situacao }) {
+async function pp_salvarConfiguracao({ corretor_id, custosItens, objetivosItens }) {
+  await garantirSchema();
+  const agora = new Date().toISOString();
+  const custosJson    = JSON.stringify(custosItens    || []);
+  const objetivosJson = JSON.stringify(objetivosItens || []);
+
+  return client.execute({
+    sql: `INSERT INTO pp_configuracao (corretor_id, custos_fixos, objetivo_anual, custos_itens, objetivos_itens, atualizado_em)
+          VALUES (?, 0, 0, ?, ?, ?)
+          ON CONFLICT(corretor_id) DO UPDATE SET
+            custos_itens     = excluded.custos_itens,
+            objetivos_itens  = excluded.objetivos_itens,
+            atualizado_em    = excluded.atualizado_em`,
+    args: [corretor_id, custosJson, objetivosJson, agora]
+  });
+}
+
+async function pp_obterConfiguracao(corretor_id) {
+  await garantirSchema();
+  const r = await client.execute({
+    sql: 'SELECT * FROM pp_configuracao WHERE corretor_id = ?',
+    args: [corretor_id]
+  });
+  return r.rows[0] || null;
+}
+
+async function pp_criarCorretor({ nome, email, situacao, setup_token, setup_token_exp }) {
   await garantirSchema();
   return client.execute({
-    sql: 'INSERT INTO pp_corretores (nome, email, senha_hash, situacao) VALUES (?, ?, ?, ?)',
-    args: [nome, email, senha_hash, situacao || 'pleno']
+    sql: `INSERT INTO pp_corretores (nome, email, senha_hash, situacao, setup_token, setup_token_exp)
+          VALUES (?, ?, NULL, ?, ?, ?)`,
+    args: [nome, email, situacao || 'pleno', setup_token, setup_token_exp]
   });
 }
 
@@ -217,8 +246,6 @@ async function pp_buscarCorretorPorEmail(email) {
   return r.rows[0] || null;
 }
 
-// Busca sem exigir "ativo" — usada para linkar com o Assessment mesmo se o
-// corretor tiver sido desativado depois.
 async function pp_buscarCorretorPorEmailQualquerStatus(email) {
   await garantirSchema();
   const r = await client.execute({
@@ -228,10 +255,37 @@ async function pp_buscarCorretorPorEmailQualquerStatus(email) {
   return r.rows[0] || null;
 }
 
+async function pp_buscarCorretorPorSetupToken(token) {
+  await garantirSchema();
+  const r = await client.execute({
+    sql: 'SELECT * FROM pp_corretores WHERE setup_token = ?',
+    args: [token]
+  });
+  return r.rows[0] || null;
+}
+
+async function pp_definirSenha(id, senha_hash) {
+  await garantirSchema();
+  return client.execute({
+    sql: `UPDATE pp_corretores
+          SET senha_hash = ?, setup_token = NULL, setup_token_exp = NULL
+          WHERE id = ?`,
+    args: [senha_hash, id]
+  });
+}
+
+async function pp_gerarNovoSetupToken(id, setup_token, setup_token_exp) {
+  await garantirSchema();
+  return client.execute({
+    sql: `UPDATE pp_corretores SET setup_token = ?, setup_token_exp = ? WHERE id = ?`,
+    args: [setup_token, setup_token_exp, id]
+  });
+}
+
 async function pp_buscarCorretorPorId(id) {
   await garantirSchema();
   const r = await client.execute({
-    sql: 'SELECT id, nome, email, situacao, ativo, criado_em FROM pp_corretores WHERE id = ?',
+    sql: 'SELECT id, nome, email, situacao, ativo, criado_em, senha_hash FROM pp_corretores WHERE id = ?',
     args: [id]
   });
   return r.rows[0] || null;
@@ -240,7 +294,9 @@ async function pp_buscarCorretorPorId(id) {
 async function pp_listarCorretores() {
   await garantirSchema();
   const r = await client.execute(
-    'SELECT id, nome, email, situacao, ativo, criado_em FROM pp_corretores ORDER BY nome ASC'
+    `SELECT id, nome, email, situacao, ativo, criado_em, setup_token,
+            CASE WHEN senha_hash IS NULL THEN 0 ELSE 1 END AS senha_definida
+     FROM pp_corretores ORDER BY nome ASC`
   );
   return r.rows;
 }
@@ -265,33 +321,6 @@ async function pp_atualizarCorretor(id, campos) {
 async function pp_removerCorretor(id) {
   await garantirSchema();
   return client.execute({ sql: 'DELETE FROM pp_corretores WHERE id = ?', args: [id] });
-}
-
-async function pp_obterConfiguracao(corretor_id) {
-  await garantirSchema();
-  const r = await client.execute({
-    sql: 'SELECT * FROM pp_configuracao WHERE corretor_id = ?',
-    args: [corretor_id]
-  });
-  return r.rows[0] || null;
-}
-
-// custosItens / objetivosItens: array de { nome, valor } — salvos como JSON
-async function pp_salvarConfiguracao({ corretor_id, custosItens, objetivosItens }) {
-  await garantirSchema();
-  const agora = new Date().toISOString();
-  const custosJson    = JSON.stringify(custosItens    || []);
-  const objetivosJson = JSON.stringify(objetivosItens || []);
-
-  return client.execute({
-    sql: `INSERT INTO pp_configuracao (corretor_id, custos_fixos, objetivo_anual, custos_itens, objetivos_itens, atualizado_em)
-          VALUES (?, 0, 0, ?, ?, ?)
-          ON CONFLICT(corretor_id) DO UPDATE SET
-            custos_itens     = excluded.custos_itens,
-            objetivos_itens  = excluded.objetivos_itens,
-            atualizado_em    = excluded.atualizado_em`,
-    args: [corretor_id, custosJson, objetivosJson, agora]
-  });
 }
 
 async function pp_listarVendas(corretor_id) {
@@ -329,6 +358,7 @@ module.exports = {
   buscarPorCodigo, salvarResultado,
   criarAssessment, listarConcluidos, buscarAssessmentGestor, obterEstatisticas,
   pp_criarCorretor, pp_buscarCorretorPorEmail, pp_buscarCorretorPorEmailQualquerStatus,
+  pp_buscarCorretorPorSetupToken, pp_definirSenha, pp_gerarNovoSetupToken,
   pp_buscarCorretorPorId,
   pp_listarCorretores, pp_atualizarCorretor, pp_removerCorretor,
   pp_obterConfiguracao, pp_salvarConfiguracao,
