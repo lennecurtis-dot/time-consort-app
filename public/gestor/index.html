@@ -266,19 +266,15 @@
           <p class="campo-formulario__erro" id="pp-erro-email" role="alert" aria-live="polite"></p>
         </div>
         <div class="campo-formulario">
-          <label class="campo-formulario__label" for="pp-input-senha">Senha de acesso</label>
-          <input class="campo-formulario__input" type="password" id="pp-input-senha"
-                 autocomplete="new-password" placeholder="Mínimo 6 caracteres"
-                 aria-describedby="pp-erro-senha">
-          <p class="campo-formulario__erro" id="pp-erro-senha" role="alert" aria-live="polite"></p>
-        </div>
-        <div class="campo-formulario">
           <label class="campo-formulario__label" for="pp-input-situacao">Situação</label>
           <select class="campo-formulario__input" id="pp-input-situacao">
             <option value="pleno">Corretor Pleno</option>
             <option value="estagiario">Estagiário</option>
           </select>
         </div>
+        <p style="font-size:.8125rem;color:#5A6275;margin-bottom:16px;">
+          O corretor vai criar a própria senha através de um link que você vai poder copiar ou enviar por WhatsApp.
+        </p>
         <button class="btn-primario" id="btn-cadastrar-pp" type="button">
           Cadastrar
         </button>
@@ -287,9 +283,22 @@
       <div class="modal-resultado" id="modal-pp-resultado" hidden>
         <div class="modal-resultado__icone" aria-hidden="true">✓</div>
         <p class="modal-resultado__label">Corretor cadastrado com sucesso!</p>
-        <p style="font-size:.875rem;color:#5A6275;margin-bottom:16px;text-align:center;">
-          O corretor já pode acessar o módulo em <strong>/pp</strong> com o e-mail e senha informados.
+        <p style="font-size:.875rem;color:#5A6275;margin-bottom:12px;text-align:center;">
+          Envie este link para o corretor criar a senha dele:
         </p>
+        <div class="modal-resultado__url-box">
+          <span class="modal-resultado__url" id="modal-pp-url-texto"></span>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <button class="btn-copiar modal-resultado__btn-copiar" id="btn-copiar-pp-link" type="button" style="flex:1;">
+            <span class="btn-copiar__icone" aria-hidden="true">⎘</span>
+            <span class="btn-copiar__texto">Copiar link</span>
+          </button>
+          <a class="btn-primario" id="btn-whatsapp-pp" href="#" target="_blank" rel="noopener noreferrer"
+             style="text-decoration:none; text-align:center; background:#25D366; flex:1; display:flex; align-items:center; justify-content:center;">
+            Enviar por WhatsApp
+          </a>
+        </div>
         <button class="btn-secundario modal-resultado__btn-novo" id="btn-outro-pp" type="button">
           Cadastrar outro
         </button>
@@ -339,10 +348,16 @@
         <div class="modal-resultado__url-box">
           <span class="modal-resultado__url" id="modal-url-texto"></span>
         </div>
-        <button class="btn-copiar modal-resultado__btn-copiar" id="btn-copiar-novo" type="button">
-          <span class="btn-copiar__icone" aria-hidden="true">⎘</span>
-          <span class="btn-copiar__texto">Copiar Link</span>
-        </button>
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <button class="btn-copiar modal-resultado__btn-copiar" id="btn-copiar-novo" type="button" style="flex:1;">
+            <span class="btn-copiar__icone" aria-hidden="true">⎘</span>
+            <span class="btn-copiar__texto">Copiar Link</span>
+          </button>
+          <a class="btn-primario" id="btn-whatsapp-novo" href="#" target="_blank" rel="noopener noreferrer"
+             style="text-decoration:none; text-align:center; background:#25D366; flex:1; display:flex; align-items:center; justify-content:center;">
+            Enviar por WhatsApp
+          </a>
+        </div>
         <button class="btn-secundario modal-resultado__btn-novo" id="btn-outro-link" type="button">
           Gerar outro link
         </button>
