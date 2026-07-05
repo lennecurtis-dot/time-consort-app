@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#071A3D">
+  <title>Criar senha — TIME CONSORT</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="stylesheet" href="css/pp.css">
+</head>
+<body>
+<div class="pp-login-container">
+  <div class="pp-login-box" id="caixa-conteudo">
+    <div class="pp-logo" role="img" aria-label="TIME CONSORT">
+      <svg viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <polygon points="0,20 8,10 16,20 8,30" fill="#D4AF37"/>
+        <text x="24" y="27" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#071A3D" font-weight="bold" letter-spacing="1.5">TIME CONSORT</text>
+      </svg>
+    </div>
+
+    <div id="estado-carregando">
+      <h1 class="pp-login-titulo">Carregando…</h1>
+    </div>
+
+    <div id="estado-formulario" hidden>
+      <h1 class="pp-login-titulo">Bem-vindo(a), <span id="nome-corretor"></span>!</h1>
+      <p class="pp-login-subtitulo">Crie sua senha de acesso ao Pior Patrão</p>
+
+      <div class="pp-campo">
+        <label class="pp-campo__label" for="input-senha">Nova senha</label>
+        <input class="pp-campo__input" type="password" id="input-senha"
+               autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+      </div>
+      <div class="pp-campo">
+        <label class="pp-campo__label" for="input-confirmar">Confirmar senha</label>
+        <input class="pp-campo__input" type="password" id="input-confirmar"
+               autocomplete="new-password" placeholder="Digite novamente">
+        <p class="pp-campo__erro" id="erro-senha" role="alert" aria-live="polite"></p>
+      </div>
+      <button class="pp-btn-primario" id="btn-criar-senha" type="button">Criar senha e entrar</button>
+    </div>
+
+    <div id="estado-erro" hidden>
+      <h1 class="pp-login-titulo">Ops!</h1>
+      <p class="pp-login-subtitulo" id="mensagem-erro">Este link é inválido ou já expirou.</p>
+    </div>
+
+    <div id="estado-sucesso" hidden>
+      <h1 class="pp-login-titulo">Senha criada! ✓</h1>
+      <p class="pp-login-subtitulo">Agora você já pode entrar no Pior Patrão.</p>
+      <a class="pp-btn-primario" href="/pp" style="display:block; text-align:center; text-decoration:none;">
+        Ir para o login
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const token  = params.get('token');
+
+  const elCarregando = document.getElementById('estado-carregando');
+  const elFormulario  = document.getElementById('estado-formulario');
+  const elErro        = document.getElementById('estado-erro');
+  const elSucesso      = document.getElementById('estado-sucesso');
+
+  function mostrar(elId) {
+    [elCarregando, elFormulario, elErro, elSucesso].forEach(el => el.hidden = true);
+    elId.hidden = false;
+  }
+
+  function mostrarErro(msg) {
+    document.getElementById('mensagem-erro').textContent = msg || 'Este link é inválido ou já expirou.';
+    mostrar(elErro);
+  }
+
+  if (!token) {
+    mostrarErro('Link incompleto. Peça ao gestor para reenviar.');
+    return;
+  }
+
+  fetch(`/api/pp/setup/${encodeURIComponent(token)}`)
+    .then(r => r.json().then(data => ({ status: r.status, data })))
+    .then(({ status, data }) => {
+      if (status !== 200) {
+        mostrarErro(data.erro);
+        return;
+      }
+      document.getElementById('nome-corretor').textContent = data.nome;
+      mostrar(elFormulario);
+    })
+    .catch(() => mostrarErro('Erro de conexão. Tente novamente.'));
+
+  document.getElementById('btn-criar-senha').addEventListener('click', async () => {
+    const senha      = document.getElementById('input-senha').value;
+    const confirmar   = document.getElementById('input-confirmar').value;
+    const erroEl      = document.getElementById('erro-senha');
+    const btnEl       = document.getElementById('btn-criar-senha');
+
+    erroEl.textContent = '';
+
+    if (senha.length < 6) {
+      erroEl.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+      return;
+    }
+    if (senha !== confirmar) {
+      erroEl.textContent = 'As senhas não coincidem.';
+      return;
+    }
+
+    btnEl.disabled    = true;
+    btnEl.textContent = 'Salvando…';
+
+    try {
+      const r    = await fetch(`/api/pp/setup/${encodeURIComponent(token)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha })
+      });
+      const data = await r.json();
+
+      if (r.status !== 200) {
+        erroEl.textContent = data.erro || 'Erro ao salvar. Tente novamente.';
+        btnEl.disabled    = false;
+        btnEl.textContent = 'Criar senha e entrar';
+        return;
+      }
+
+      mostrar(elSucesso);
+    } catch (_) {
+      erroEl.textContent = 'Erro de conexão. Tente novamente.';
+      btnEl.disabled    = false;
+      btnEl.textContent = 'Criar senha e entrar';
+    }
+  });
+})();
+</script>
+</body>
+</html>
