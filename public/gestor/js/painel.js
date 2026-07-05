@@ -148,6 +148,7 @@ function deslogar() {
   state.token = null;
   sessionStorage.removeItem(SESSION_KEY);
   fecharModal();
+  fecharModalPP();
   navegarPara('login');
   setTimeout(() => document.getElementById('input-senha').focus(), 60);
 }
@@ -427,7 +428,6 @@ async function gerarLink() {
       return;
     }
 
-    // Exibir resultado
     document.getElementById('modal-corpo-form').hidden = true;
     const resultado = document.getElementById('modal-resultado');
     resultado.hidden = false;
@@ -435,6 +435,10 @@ async function gerarLink() {
 
     const btnCopiar = document.getElementById('btn-copiar-novo');
     btnCopiar.onclick = () => copiarTexto(data.url, btnCopiar);
+
+    const btnWhats = document.getElementById('btn-whatsapp-novo');
+    btnWhats.href  = data.whatsappLink || '#';
+
     btnCopiar.focus();
 
   } catch (_) {
@@ -447,35 +451,29 @@ async function gerarLink() {
 // ─── Inicialização e event listeners ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
 
-  // Login
   document.getElementById('btn-entrar').addEventListener('click', login);
   document.getElementById('input-senha').addEventListener('keydown', e => {
     if (e.key === 'Enter') login();
   });
 
-  // Logout (todos os botões com classe .btn-logout)
   document.querySelectorAll('.btn-logout').forEach(btn => {
     btn.addEventListener('click', deslogar);
   });
 
-  // Dashboard → Lista completa
   document.getElementById('btn-ver-todos').addEventListener('click', () => {
     carregarLista(1, '');
   });
 
-  // Lista → Painel
   document.getElementById('btn-voltar-dashboard').addEventListener('click', () => {
     carregarDashboard();
   });
 
-  // Busca com debounce
   let debounce;
   document.getElementById('input-busca').addEventListener('input', e => {
     clearTimeout(debounce);
     debounce = setTimeout(() => carregarLista(1, e.target.value.trim()), 350);
   });
 
-  // Paginação
   document.getElementById('btn-anterior-pag').addEventListener('click', () => {
     if (state.paginaAtual > 1) carregarLista(state.paginaAtual - 1, state.buscaAtual);
   });
@@ -483,7 +481,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.paginaAtual < state.totalPaginas) carregarLista(state.paginaAtual + 1, state.buscaAtual);
   });
 
-  // Detalhe → Voltar
   document.getElementById('btn-voltar-detalhe').addEventListener('click', () => {
     if (state.viewAnterior === 'dashboard') {
       carregarDashboard();
@@ -492,37 +489,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Modal — abrir
   document.getElementById('btn-abrir-modal').addEventListener('click', abrirModal);
   document.getElementById('btn-abrir-modal-lista').addEventListener('click', abrirModal);
 
-  // Modal — fechar
   document.getElementById('btn-fechar-modal').addEventListener('click', fecharModal);
   document.getElementById('modal-novo').addEventListener('click', e => {
     if (e.target === e.currentTarget) fecharModal();
   });
 
-  // Modal — gerar link
   document.getElementById('btn-gerar-link').addEventListener('click', gerarLink);
   document.getElementById('modal-input-email').addEventListener('keydown', e => {
     if (e.key === 'Enter') gerarLink();
   });
 
-  // Modal — gerar outro link
   document.getElementById('btn-outro-link').addEventListener('click', resetarModal);
 
-  // Fechar com Escape
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { fecharModal(); fecharModalPP(); }
   });
 
-  // Pior Patrão — botão no header do dashboard
   document.getElementById('btn-ir-pp').addEventListener('click', carregarPiorPatrao);
-
-  // Pior Patrão — voltar ao dashboard
   document.getElementById('btn-voltar-pp').addEventListener('click', carregarDashboard);
 
-  // Pior Patrão — abrir modal de novo corretor
   document.getElementById('btn-abrir-modal-pp').addEventListener('click', abrirModalPP);
   document.getElementById('btn-fechar-modal-pp').addEventListener('click', fecharModalPP);
   document.getElementById('modal-pp').addEventListener('click', e => {
@@ -531,7 +519,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-cadastrar-pp').addEventListener('click', cadastrarCorretorPP);
   document.getElementById('btn-outro-pp').addEventListener('click', resetarModalPP);
 
-  // Sessão ativa ao abrir a página
   if (state.token) {
     carregarDashboard();
   } else {
@@ -580,9 +567,24 @@ async function carregarPiorPatrao() {
           <span class="${c.ativo ? 'pp-gestor-ativo' : 'pp-gestor-inativo'}">
             ${c.ativo ? 'Ativo' : 'Inativo'}
           </span>
+          ${c.senha_definida
+            ? '<br><span style="font-size:.75rem; color:#1A7A4A;">✓ Senha criada</span>'
+            : '<br><span style="font-size:.75rem; color:#A06B00;">⏳ Aguardando senha</span>'
+          }
         </td>
         <td class="col-data">${esc(formatarData(c.criado_em))}</td>
         <td class="col-link">
+          ${!c.senha_definida ? `
+            <button class="btn-pp-acao" data-id="${esc(String(c.id))}"
+                    data-nome="${esc(c.nome)}" data-acao="reenviar" type="button">
+              Copiar link
+            </button>
+            <a class="btn-pp-acao" data-id="${esc(String(c.id))}"
+               data-nome="${esc(c.nome)}" data-acao="whatsapp" href="#" target="_blank"
+               rel="noopener noreferrer" style="text-decoration:none; display:inline-block;">
+              WhatsApp
+            </a>
+          ` : ''}
           <button class="btn-pp-acao btn-pp-acao--toggle"
                   data-id="${esc(String(c.id))}"
                   data-ativo="${c.ativo ? '1' : '0'}"
@@ -613,9 +615,53 @@ async function carregarPiorPatrao() {
       ));
     });
 
+    tbody.querySelectorAll('[data-acao="reenviar"]').forEach(btn => {
+      btn.addEventListener('click', () => reenviarLinkPP(parseInt(btn.dataset.id), btn, 'copiar'));
+    });
+
+    tbody.querySelectorAll('[data-acao="whatsapp"]').forEach(link => {
+      link.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await reenviarLinkPP(parseInt(link.dataset.id), link, 'whatsapp');
+      });
+    });
+
   } catch (_) {
     document.getElementById('tbody-pp').innerHTML =
       '<tr><td colspan="6" class="painel-tabela__vazio">Erro ao carregar.</td></tr>';
+  }
+}
+
+// ─── Gerar/copiar novamente o link de criação de senha ───────────────────────
+async function reenviarLinkPP(id, elBtn, modo) {
+  const textoOriginal = elBtn.textContent;
+  elBtn.textContent = '...';
+
+  try {
+    const { status, data } = await apiFetch(`/api/gestor/pp/corretores/${id}/reenviar-link`, {
+      method: 'POST'
+    });
+    if (status === 401) { deslogar(); return; }
+
+    if (status !== 200 || !data.ok) {
+      alert(data.erro || 'Erro ao gerar link.');
+      elBtn.textContent = textoOriginal;
+      return;
+    }
+
+    if (modo === 'whatsapp') {
+      window.open(data.whatsappLink, '_blank', 'noopener,noreferrer');
+    } else {
+      await copiarTexto(data.linkDefinirSenha, null);
+      elBtn.textContent = 'Copiado!';
+      setTimeout(() => { elBtn.textContent = textoOriginal; }, 2000);
+      return;
+    }
+
+    elBtn.textContent = textoOriginal;
+  } catch (_) {
+    alert('Erro de conexão. Tente novamente.');
+    elBtn.textContent = textoOriginal;
   }
 }
 
@@ -670,11 +716,9 @@ function resetarModalPP() {
   document.getElementById('modal-pp-resultado').hidden = true;
   document.getElementById('pp-input-nome').value     = '';
   document.getElementById('pp-input-email').value    = '';
-  document.getElementById('pp-input-senha').value    = '';
   document.getElementById('pp-input-situacao').value = 'pleno';
   document.getElementById('pp-erro-nome').textContent  = '';
   document.getElementById('pp-erro-email').textContent = '';
-  document.getElementById('pp-erro-senha').textContent = '';
   const btn = document.getElementById('btn-cadastrar-pp');
   btn.disabled    = false;
   btn.textContent = 'Cadastrar';
@@ -683,20 +727,16 @@ function resetarModalPP() {
 async function cadastrarCorretorPP() {
   const nomeEl     = document.getElementById('pp-input-nome');
   const emailEl    = document.getElementById('pp-input-email');
-  const senhaEl    = document.getElementById('pp-input-senha');
   const situacaoEl = document.getElementById('pp-input-situacao');
   const erroNome   = document.getElementById('pp-erro-nome');
   const erroEmail  = document.getElementById('pp-erro-email');
-  const erroSenha  = document.getElementById('pp-erro-senha');
   const btnEl      = document.getElementById('btn-cadastrar-pp');
 
   erroNome.textContent  = '';
   erroEmail.textContent = '';
-  erroSenha.textContent = '';
 
   const nome     = nomeEl.value.trim();
   const email    = emailEl.value.trim();
-  const senha    = senhaEl.value;
   const situacao = situacaoEl.value;
 
   let valido = true;
@@ -708,10 +748,6 @@ async function cadastrarCorretorPP() {
     erroEmail.textContent = 'E-mail inválido.';
     if (valido) { emailEl.focus(); valido = false; }
   }
-  if (!senha || senha.length < 6) {
-    erroSenha.textContent = 'Senha obrigatória (mínimo 6 caracteres).';
-    if (valido) { senhaEl.focus(); valido = false; }
-  }
   if (!valido) return;
 
   btnEl.disabled    = true;
@@ -720,7 +756,7 @@ async function cadastrarCorretorPP() {
   try {
     const { status, data } = await apiFetch('/api/gestor/pp/corretores', {
       method: 'POST',
-      body: JSON.stringify({ nome, email, senha, situacao })
+      body: JSON.stringify({ nome, email, situacao })
     });
 
     if (status === 401) { deslogar(); return; }
@@ -734,6 +770,14 @@ async function cadastrarCorretorPP() {
 
     document.getElementById('modal-pp-corpo').hidden    = true;
     document.getElementById('modal-pp-resultado').hidden = false;
+    document.getElementById('modal-pp-url-texto').textContent = data.linkDefinirSenha;
+
+    const btnCopiar = document.getElementById('btn-copiar-pp-link');
+    btnCopiar.onclick = () => copiarTexto(data.linkDefinirSenha, btnCopiar);
+
+    const btnWhats = document.getElementById('btn-whatsapp-pp');
+    btnWhats.href  = data.whatsappLink || '#';
+
     await carregarPiorPatrao();
 
   } catch (_) {
