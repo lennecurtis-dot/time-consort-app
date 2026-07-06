@@ -861,6 +861,10 @@ async function cadastrarCorretorPP() {
 
     const btnWhats = document.getElementById('btn-whatsapp-pp');
     btnWhats.href  = data.whatsappLink || '#';
+    btnWhats.onclick = (e) => {
+      e.preventDefault();
+      window.open(data.whatsappLink, '_blank', 'noopener,noreferrer');
+    };
 
     await carregarPiorPatrao();
 
