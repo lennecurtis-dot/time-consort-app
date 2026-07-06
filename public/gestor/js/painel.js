@@ -520,8 +520,12 @@ async function gerarLink() {
     const btnCopiar = document.getElementById('btn-copiar-novo');
     btnCopiar.onclick = () => copiarTexto(data.url, btnCopiar);
 
-    const btnWhats = document.getElementById('btn-whatsapp-novo');
+   const btnWhats = document.getElementById('btn-whatsapp-novo');
     btnWhats.href  = data.whatsappLink || '#';
+    btnWhats.onclick = (e) => {
+      e.preventDefault();
+      window.open(data.whatsappLink, '_blank', 'noopener,noreferrer');
+    };
 
     btnCopiar.focus();
 
