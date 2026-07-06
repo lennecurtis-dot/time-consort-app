@@ -374,3 +374,392 @@ app.get('/api/gestor/assessments/:id', autenticacaoGestor, async (req, res) => {
       email:        a.email,
       status:       a.status,
       criado_em:    a.criado_em,
+      concluido_em: a.concluido_em,
+      url:          `${getBaseUrl()}/a/${a.codigo}`,
+      resultado,
+      piorPatrao
+    });
+  } catch (err) {
+    console.error('[detalhe assessment] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MÓDULO PIOR PATRÃO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function autenticacaoPP(req, res, next) {
+  const header  = req.headers['authorization'] || '';
+  const token   = header.startsWith('Bearer ') ? header.slice(7) : '';
+  const payload = verificarToken(token);
+
+  if (!payload || payload.tipo !== 'pp' || !payload.corretorId) {
+    return res.status(401).json({ erro: 'Não autorizado.' });
+  }
+  req.ppCorretorId = payload.corretorId;
+  next();
+}
+
+function hashSenha(senha) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(senha, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verificarSenha(senha, armazenado) {
+  const [salt, hash] = armazenado.split(':');
+  const hashTentativa = crypto.scryptSync(senha, salt, 64).toString('hex');
+  const buf1 = Buffer.from(hash,         'hex');
+  const buf2 = Buffer.from(hashTentativa,'hex');
+  return buf1.length === buf2.length && crypto.timingSafeEqual(buf1, buf2);
+}
+
+app.get(['/pp', '/pp/'], (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'pior-patrao', 'index.html'));
+});
+
+app.get(['/pp/definir-senha', '/pp/definir-senha/'], (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'pior-patrao', 'definir-senha.html'));
+});
+
+app.get('/api/pp/setup/:token', async (req, res) => {
+  try {
+    const corretor = await pp_buscarCorretorPorSetupToken(req.params.token);
+    if (!corretor) {
+      return res.status(404).json({ erro: 'Link inválido ou já utilizado.' });
+    }
+    if (!corretor.setup_token_exp || Date.now() > Number(corretor.setup_token_exp)) {
+      return res.status(410).json({ erro: 'Este link expirou. Peça ao gestor para gerar um novo.' });
+    }
+    return res.json({ ok: true, nome: corretor.nome });
+  } catch (err) {
+    console.error('[pp setup verificar] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.post('/api/pp/setup/:token', async (req, res) => {
+  const { senha } = req.body || {};
+
+  if (!senha || typeof senha !== 'string' || senha.length < 6) {
+    return res.status(400).json({ erro: 'Senha obrigatória (mínimo 6 caracteres).' });
+  }
+
+  try {
+    const corretor = await pp_buscarCorretorPorSetupToken(req.params.token);
+    if (!corretor) {
+      return res.status(404).json({ erro: 'Link inválido ou já utilizado.' });
+    }
+    if (!corretor.setup_token_exp || Date.now() > Number(corretor.setup_token_exp)) {
+      return res.status(410).json({ erro: 'Este link expirou. Peça ao gestor para gerar um novo.' });
+    }
+
+    const senha_hash = hashSenha(senha);
+    await pp_definirSenha(corretor.id, senha_hash);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[pp setup definir] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.post('/api/pp/login', async (req, res) => {
+  const { email, senha } = req.body || {};
+
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ erro: 'E-mail obrigatório.' });
+  }
+  if (!senha || typeof senha !== 'string') {
+    return res.status(400).json({ erro: 'Senha obrigatória.' });
+  }
+
+  try {
+    const corretor = await pp_buscarCorretorPorEmail(email.trim().toLowerCase());
+    if (!corretor) {
+      return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
+    }
+    if (!corretor.senha_hash) {
+      return res.status(403).json({ erro: 'Você ainda não definiu sua senha. Use o link enviado pelo gestor.' });
+    }
+    if (!verificarSenha(senha, corretor.senha_hash)) {
+      return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
+    }
+
+    const token = assinarToken({ tipo: 'pp', corretorId: corretor.id });
+    return res.json({ ok: true, token, nome: corretor.nome, situacao: corretor.situacao });
+  } catch (err) {
+    console.error('[pp login] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.post('/api/pp/logout', autenticacaoPP, (_req, res) => {
+  return res.json({ ok: true });
+});
+
+app.get('/api/pp/perfil', autenticacaoPP, async (req, res) => {
+  try {
+    const c = await pp_buscarCorretorPorId(req.ppCorretorId);
+    if (!c) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+    return res.json({ id: c.id, nome: c.nome, email: c.email, situacao: c.situacao });
+  } catch (err) {
+    console.error('[pp perfil] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.get('/api/pp/configuracao', autenticacaoPP, async (req, res) => {
+  try {
+    const cfg = await pp_obterConfiguracao(req.ppCorretorId);
+    return res.json({
+      custosItens:    cfg ? parseItensJson(cfg.custos_itens)    : [],
+      objetivosItens: cfg ? parseItensJson(cfg.objetivos_itens) : []
+    });
+  } catch (err) {
+    console.error('[pp configuracao get] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.put('/api/pp/configuracao', autenticacaoPP, async (req, res) => {
+  const { custosItens, objetivosItens } = req.body || {};
+
+  if (!Array.isArray(custosItens) || !Array.isArray(objetivosItens)) {
+    return res.status(400).json({ erro: 'Formato inválido.' });
+  }
+
+  const limparItens = (lista) => lista
+    .map(it => ({
+      nome:  typeof it.nome === 'string' ? it.nome.trim().slice(0, 100) : '',
+      valor: Number(it.valor)
+    }))
+    .filter(it => it.nome && !isNaN(it.valor) && it.valor >= 0);
+
+  const custosLimpos    = limparItens(custosItens);
+  const objetivosLimpos = limparItens(objetivosItens);
+
+  try {
+    await pp_salvarConfiguracao({
+      corretor_id:    req.ppCorretorId,
+      custosItens:    custosLimpos,
+      objetivosItens: objetivosLimpos
+    });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[pp configuracao put] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.get('/api/pp/calculos', autenticacaoPP, async (req, res) => {
+  try {
+    const corretor = await pp_buscarCorretorPorId(req.ppCorretorId);
+    const cfg      = await pp_obterConfiguracao(req.ppCorretorId);
+
+    const custosItens    = cfg ? parseItensJson(cfg.custos_itens)    : [];
+    const objetivosItens = cfg ? parseItensJson(cfg.objetivos_itens) : [];
+
+    if (!custosItens.length && !objetivosItens.length) {
+      return res.json({ configurado: false });
+    }
+
+    const metas = calcularMetas({
+      custosItens,
+      objetivosItens,
+      situacao: corretor.situacao
+    });
+
+    return res.json({ configurado: true, ...metas });
+  } catch (err) {
+    console.error('[pp calculos] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.get('/api/pp/vendas', autenticacaoPP, async (req, res) => {
+  try {
+    const vendas = await pp_listarVendas(req.ppCorretorId);
+    return res.json({ items: vendas });
+  } catch (err) {
+    console.error('[pp vendas get] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.post('/api/pp/vendas', autenticacaoPP, async (req, res) => {
+  const { descricao, vgv, data_venda } = req.body || {};
+
+  if (typeof vgv !== 'number' || vgv <= 0) {
+    return res.status(400).json({ erro: 'VGV inválido.' });
+  }
+  if (!data_venda || typeof data_venda !== 'string') {
+    return res.status(400).json({ erro: 'Data da venda obrigatória.' });
+  }
+
+  try {
+    const corretor = await pp_buscarCorretorPorId(req.ppCorretorId);
+    const { comissao, dist_reinvestimento, dist_custos, dist_lucro } =
+      calcularComissao({ vgv, situacao: corretor.situacao });
+
+    await pp_registrarVenda({
+      corretor_id: req.ppCorretorId,
+      descricao:   typeof descricao === 'string' ? descricao.trim().slice(0, 300) : '',
+      vgv,
+      data_venda,
+      comissao,
+      dist_reinvestimento,
+      dist_custos,
+      dist_lucro
+    });
+
+    return res.json({ ok: true, comissao, dist_reinvestimento, dist_custos, dist_lucro });
+  } catch (err) {
+    console.error('[pp venda post] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.delete('/api/pp/vendas/:id', autenticacaoPP, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
+
+  try {
+    const r = await pp_removerVenda(id, req.ppCorretorId);
+    if (!r.rowsAffected) return res.status(404).json({ erro: 'Venda não encontrada.' });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[pp venda delete] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.get('/api/gestor/pp/corretores', autenticacaoGestor, async (_req, res) => {
+  try {
+    const lista = await pp_listarCorretores();
+    const listaComLink = lista.map(c => ({
+      ...c,
+      linkDefinirSenha: c.senha_definida ? null : `${getBaseUrl()}/pp/definir-senha?token=${c.setup_token}`
+    }));
+    return res.json({ items: listaComLink });
+  } catch (err) {
+    console.error('[pp corretores get] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.post('/api/gestor/pp/corretores', autenticacaoGestor, async (req, res) => {
+  const { nome, email, situacao } = req.body || {};
+
+  if (!nome || typeof nome !== 'string' || nome.trim().length < 3) {
+    return res.status(400).json({ erro: 'Nome obrigatório (mínimo 3 caracteres).' });
+  }
+  if (!email || typeof email !== 'string' || !email.includes('@') || !email.includes('.')) {
+    return res.status(400).json({ erro: 'E-mail inválido.' });
+  }
+  if (situacao && !['estagiario', 'pleno'].includes(situacao)) {
+    return res.status(400).json({ erro: 'Situação inválida.' });
+  }
+
+  const nomeLimpo  = nome.trim().slice(0, 200);
+  const emailLimpo = email.trim().toLowerCase().slice(0, 200);
+  const setupToken = crypto.randomBytes(24).toString('hex');
+  const setupExp   = Date.now() + SETUP_TOKEN_DURACAO_MS;
+
+  try {
+    await pp_criarCorretor({
+      nome: nomeLimpo, email: emailLimpo, situacao: situacao || 'pleno',
+      setup_token: setupToken, setup_token_exp: setupExp
+    });
+
+    const linkDefinirSenha = `${getBaseUrl()}/pp/definir-senha?token=${setupToken}`;
+    const mensagemWhats = `Olá ${nomeLimpo}! Você foi cadastrado(a) no Pior Patrão (TIME CONSORT). Crie sua senha de acesso aqui: ${linkDefinirSenha}`;
+    const whatsappLink  = `https://wa.me/?text=${encodeURIComponent(mensagemWhats)}`;
+
+    return res.json({ ok: true, linkDefinirSenha, whatsappLink });
+  } catch (err) {
+    if (String(err).includes('UNIQUE')) {
+      return res.status(409).json({ erro: 'E-mail já cadastrado.' });
+    }
+    console.error('[pp corretor] Erro ao criar:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.post('/api/gestor/pp/corretores/:id/reenviar-link', autenticacaoGestor, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
+
+  try {
+    const corretor = await pp_buscarCorretorPorId(id);
+    if (!corretor) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+
+    const setupToken = crypto.randomBytes(24).toString('hex');
+    const setupExp   = Date.now() + SETUP_TOKEN_DURACAO_MS;
+    await pp_gerarNovoSetupToken(id, setupToken, setupExp);
+
+    const linkDefinirSenha = `${getBaseUrl()}/pp/definir-senha?token=${setupToken}`;
+    const mensagemWhats = `Olá ${corretor.nome}! Aqui está seu link para criar/alterar sua senha do Pior Patrão (TIME CONSORT): ${linkDefinirSenha}`;
+    const whatsappLink  = `https://wa.me/?text=${encodeURIComponent(mensagemWhats)}`;
+
+    return res.json({ ok: true, linkDefinirSenha, whatsappLink });
+  } catch (err) {
+    console.error('[pp reenviar link] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.put('/api/gestor/pp/corretores/:id', autenticacaoGestor, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
+
+  const { nome, situacao, ativo } = req.body || {};
+  const campos = {};
+
+  if (nome     !== undefined) campos.nome     = String(nome).trim().slice(0, 200);
+  if (situacao !== undefined) {
+    if (!['estagiario', 'pleno'].includes(situacao)) {
+      return res.status(400).json({ erro: 'Situação inválida.' });
+    }
+    campos.situacao = situacao;
+  }
+  if (ativo !== undefined) campos.ativo = ativo ? 1 : 0;
+
+  try {
+    const r = await pp_atualizarCorretor(id, campos);
+    if (!r) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[pp corretor put] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+app.delete('/api/gestor/pp/corretores/:id', autenticacaoGestor, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
+
+  try {
+    const r = await pp_removerCorretor(id);
+    if (!r.rowsAffected) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[pp corretor delete] Erro:', err);
+    return res.status(500).json({ erro: 'Erro interno.' });
+  }
+});
+
+// ─── 404 JSON para rotas de API desconhecidas ─────────────────────────────────
+app.use('/api/*', (_req, res) => {
+  res.status(404).json({ erro: 'Rota não encontrada.' });
+});
+
+// ─── Boot (apenas quando executado diretamente, não quando importado) ──────────
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Assessment Imobiliário — servidor na porta ${PORT}`);
+  });
+}
+
+module.exports = app;
