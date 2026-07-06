@@ -23,6 +23,10 @@ function esc(str) {
     .replace(/'/g, '&#039;');
 }
 
+function brl(valor) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor ?? 0);
+}
+
 async function copiarTexto(texto, btnEl) {
   try {
     await navigator.clipboard.writeText(texto);
@@ -72,6 +76,9 @@ function labelApt(k) {
   const m = { pap: 'Prosp. Presencial', ligarAtivo: 'Ligações Ativas',
                leadsDigitais: 'Leads Digitais', plantao: 'Plantão' };
   return m[k] || k || '—';
+}
+function labelSituacaoPP(s) {
+  return s === 'estagiario' ? 'Estagiário' : 'Corretor Pleno';
 }
 
 function copiarMini(btnEl) {
@@ -310,8 +317,10 @@ function renderizarPaginacao() {
 
 // ─── Detalhe ───────────────────────────────────────────────────────────────────
 async function verDetalhe(id, origem = 'lista') {
-  const container = document.getElementById('detalhe-relatorio');
-  container.innerHTML = '<div class="painel-carregando">Carregando relatório…</div>';
+  const container   = document.getElementById('detalhe-relatorio');
+  const containerPP = document.getElementById('detalhe-pp');
+  container.innerHTML   = '<div class="painel-carregando">Carregando relatório…</div>';
+  containerPP.innerHTML = '';
 
   const btnVoltar = document.getElementById('btn-voltar-detalhe');
   btnVoltar.textContent = origem === 'dashboard' ? '← Painel' : '← Lista';
@@ -345,6 +354,8 @@ async function verDetalhe(id, origem = 'lista') {
       btnUrl.hidden = true;
     }
 
+    renderizarPiorPatraoDetalhe(data.piorPatrao, containerPP);
+
     if (data.resultado) {
       container.innerHTML = '';
       window.renderizarRelatorio(data.resultado, container);
@@ -354,6 +365,79 @@ async function verDetalhe(id, origem = 'lista') {
   } catch (_) {
     container.innerHTML = '<p class="painel-erro">Erro de conexão. Tente novamente.</p>';
   }
+}
+
+// ─── Seção Pior Patrão dentro do detalhe do gestor ────────────────────────────
+function renderizarPiorPatraoDetalhe(pp, container) {
+  if (!pp || !pp.cadastrado) {
+    container.innerHTML = `
+      <div class="painel-secao" style="border-left: 3px solid #E0E3EC;">
+        <h3 class="painel-secao__titulo" style="font-size:1rem;">Pior Patrão</h3>
+        <p style="color:#5A6275; font-size:.875rem;">Este corretor ainda não está cadastrado no módulo Pior Patrão.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const situacaoLabel = labelSituacaoPP(pp.situacao);
+  const statusAtivo   = pp.ativo ? 'Ativo' : 'Inativo';
+
+  let metasHtml = '<p style="color:#5A6275; font-size:.875rem;">Ainda não configurou custos e objetivos.</p>';
+  if (pp.configurado && pp.metas) {
+    metasHtml = `
+      <div class="stats-grid" style="margin-top:12px;">
+        <div class="stat-card">
+          <span class="stat-card__rotulo">Custo mensal (+30%)</span>
+          <span class="stat-card__valor stat-card__valor--md">${brl(pp.metas.custoMensalTotal)}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__rotulo">Total 12 meses (custos)</span>
+          <span class="stat-card__valor stat-card__valor--md">${brl(pp.metas.custoAnualTotal)}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__rotulo">Objetivos (+30%)</span>
+          <span class="stat-card__valor stat-card__valor--md">${brl(pp.metas.objetivoTotal)}</span>
+        </div>
+        <div class="stat-card stat-card--destaque">
+          <span class="stat-card__rotulo">Necessário ganhar / ano</span>
+          <span class="stat-card__valor">${brl(pp.metas.ganhoAnual)}</span>
+        </div>
+        <div class="stat-card stat-card--destaque">
+          <span class="stat-card__rotulo">Necessário ganhar / mês</span>
+          <span class="stat-card__valor">${brl(pp.metas.ganhoMensal)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <div class="painel-secao" style="border-left: 3px solid #D4AF37;">
+      <div class="painel-secao__cabecalho">
+        <h3 class="painel-secao__titulo" style="font-size:1rem;">Pior Patrão</h3>
+        <span class="pp-gestor-situacao pp-gestor-situacao--${esc(pp.situacao)}">${esc(situacaoLabel)}</span>
+      </div>
+      <p style="color:#5A6275; font-size:.8125rem; margin-bottom:8px;">
+        Status: <strong>${statusAtivo}</strong>
+      </p>
+
+      ${metasHtml}
+
+      <div class="stats-grid" style="margin-top:12px;">
+        <div class="stat-card">
+          <span class="stat-card__rotulo">Total de vendas</span>
+          <span class="stat-card__valor stat-card__valor--md">${pp.totalVendas ?? 0}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__rotulo">VGV total</span>
+          <span class="stat-card__valor stat-card__valor--md">${brl(pp.vgvTotal)}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__rotulo">Comissão total</span>
+          <span class="stat-card__valor stat-card__valor--md">${brl(pp.comissaoTotal)}</span>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 // ─── Modal Novo Assessment ──────────────────────────────────────────────────────
@@ -530,10 +614,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MÓDULO PIOR PATRÃO — lógica do painel do gestor
 // ═══════════════════════════════════════════════════════════════════════════════
-
-function labelSituacaoPP(s) {
-  return s === 'estagiario' ? 'Estagiário' : 'Corretor Pleno';
-}
 
 // ─── Carregar lista de corretores PP ─────────────────────────────────────────
 async function carregarPiorPatrao() {
