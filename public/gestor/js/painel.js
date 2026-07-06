@@ -94,6 +94,17 @@ function copiarMini(btnEl) {
   }, 2000);
 }
 
+// ─── Abrir WhatsApp de forma mais confiável (evita "sequestro" pelo app desktop) ─
+function abrirWhatsApp(link) {
+  const novaAba = window.open('', '_blank');
+  if (novaAba) {
+    novaAba.location.href = link;
+  } else {
+    // Bloqueio de pop-up: tenta navegação direta como último recurso
+    window.location.href = link;
+  }
+}
+
 // ─── Navegação ─────────────────────────────────────────────────────────────────
 function navegarPara(viewId) {
   document.querySelectorAll('.painel-view').forEach(el => {
@@ -520,11 +531,10 @@ async function gerarLink() {
     const btnCopiar = document.getElementById('btn-copiar-novo');
     btnCopiar.onclick = () => copiarTexto(data.url, btnCopiar);
 
-   const btnWhats = document.getElementById('btn-whatsapp-novo');
-    btnWhats.href  = data.whatsappLink || '#';
+    const btnWhats = document.getElementById('btn-whatsapp-novo');
     btnWhats.onclick = (e) => {
       e.preventDefault();
-      window.open(data.whatsappLink, '_blank', 'noopener,noreferrer');
+      abrirWhatsApp(data.whatsappLink);
     };
 
     btnCopiar.focus();
@@ -663,11 +673,10 @@ async function carregarPiorPatrao() {
                     data-nome="${esc(c.nome)}" data-acao="reenviar" type="button">
               Copiar link
             </button>
-            <a class="btn-pp-acao" data-id="${esc(String(c.id))}"
-               data-nome="${esc(c.nome)}" data-acao="whatsapp" href="#" target="_blank"
-               rel="noopener noreferrer" style="text-decoration:none; display:inline-block;">
+            <button class="btn-pp-acao" data-id="${esc(String(c.id))}"
+                    data-nome="${esc(c.nome)}" data-acao="whatsapp" type="button">
               WhatsApp
-            </a>
+            </button>
           ` : ''}
           <button class="btn-pp-acao btn-pp-acao--toggle"
                   data-id="${esc(String(c.id))}"
@@ -703,11 +712,8 @@ async function carregarPiorPatrao() {
       btn.addEventListener('click', () => reenviarLinkPP(parseInt(btn.dataset.id), btn, 'copiar'));
     });
 
-    tbody.querySelectorAll('[data-acao="whatsapp"]').forEach(link => {
-      link.addEventListener('click', async (e) => {
-        e.preventDefault();
-        await reenviarLinkPP(parseInt(link.dataset.id), link, 'whatsapp');
-      });
+    tbody.querySelectorAll('[data-acao="whatsapp"]').forEach(btn => {
+      btn.addEventListener('click', () => reenviarLinkPP(parseInt(btn.dataset.id), btn, 'whatsapp'));
     });
 
   } catch (_) {
@@ -734,15 +740,14 @@ async function reenviarLinkPP(id, elBtn, modo) {
     }
 
     if (modo === 'whatsapp') {
-      window.open(data.whatsappLink, '_blank', 'noopener,noreferrer');
+      abrirWhatsApp(data.whatsappLink);
+      elBtn.textContent = textoOriginal;
     } else {
       await copiarTexto(data.linkDefinirSenha, null);
       elBtn.textContent = 'Copiado!';
       setTimeout(() => { elBtn.textContent = textoOriginal; }, 2000);
       return;
     }
-
-    elBtn.textContent = textoOriginal;
   } catch (_) {
     alert('Erro de conexão. Tente novamente.');
     elBtn.textContent = textoOriginal;
@@ -860,10 +865,9 @@ async function cadastrarCorretorPP() {
     btnCopiar.onclick = () => copiarTexto(data.linkDefinirSenha, btnCopiar);
 
     const btnWhats = document.getElementById('btn-whatsapp-pp');
-    btnWhats.href  = data.whatsappLink || '#';
     btnWhats.onclick = (e) => {
       e.preventDefault();
-      window.open(data.whatsappLink, '_blank', 'noopener,noreferrer');
+      abrirWhatsApp(data.whatsappLink);
     };
 
     await carregarPiorPatrao();
