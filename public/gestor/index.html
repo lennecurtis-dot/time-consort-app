@@ -25,9 +25,13 @@
         </div>
         <h1 class="login-titulo">Painel do Gestor</h1>
         <p class="login-subtitulo">Acesso restrito</p>
-       <p style="font-size:.8125rem;color:#5A6275;margin-bottom:16px;">
-          O corretor vai criar a própria senha através de um link que você vai poder copiar ou enviar por WhatsApp.
-        </p>
+        <div class="campo-formulario">
+          <label class="campo-formulario__label" for="input-senha">Senha de acesso</label>
+          <input class="campo-formulario__input" type="password" id="input-senha"
+                 autocomplete="current-password" placeholder="••••••••"
+                 aria-describedby="erro-login">
+          <p class="campo-formulario__erro" id="erro-login" role="alert" aria-live="polite"></p>
+        </div>
         <button class="btn-primario" id="btn-entrar" type="button">Entrar</button>
       </div>
     </div>
@@ -189,7 +193,7 @@
       </div>
     </div>
 
-  <main class="painel-corpo painel-corpo--detalhe">
+    <main class="painel-corpo painel-corpo--detalhe">
       <div id="detalhe-pp"></div>
       <div id="detalhe-relatorio"></div>
     </main>
@@ -339,7 +343,6 @@
       </div>
 
       <!-- Resultado -->
-     <!-- Resultado -->
       <div class="modal-resultado" id="modal-resultado" hidden>
         <div class="modal-resultado__icone" aria-hidden="true">✓</div>
         <p class="modal-resultado__label">Link gerado com sucesso!</p>
