@@ -16,6 +16,46 @@ async function _tentarAlterTable(sql) {
   try { await client.execute(sql); } catch (_) { /* coluna já existe — ignora */ }
 }
 
+// ─── Migração: torna pp_corretores.senha_hash opcional (era NOT NULL) ─────────
+async function _migrarSenhaHashOpcional() {
+  try {
+    const info = await client.execute("PRAGMA table_info(pp_corretores)");
+    const col  = info.rows.find(r => r.name === 'senha_hash');
+    if (!col || Number(col.notnull) !== 1) return; // já está certo, não precisa migrar
+
+    await client.execute('PRAGMA foreign_keys=OFF');
+    await client.execute('ALTER TABLE pp_corretores RENAME TO pp_corretores_old');
+
+    await client.execute(`CREATE TABLE pp_corretores (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome       TEXT    NOT NULL,
+      email      TEXT    NOT NULL UNIQUE,
+      senha_hash TEXT,
+      situacao   TEXT    NOT NULL DEFAULT 'pleno'
+                 CHECK (situacao IN ('estagiario', 'pleno')),
+      ativo      INTEGER NOT NULL DEFAULT 1,
+      criado_em  TEXT    NOT NULL DEFAULT (datetime('now')),
+      setup_token TEXT,
+      setup_token_exp TEXT
+    )`);
+
+    await client.execute(`
+      INSERT INTO pp_corretores (id, nome, email, senha_hash, situacao, ativo, criado_em, setup_token, setup_token_exp)
+      SELECT id, nome, email, senha_hash, situacao, ativo, criado_em, setup_token, setup_token_exp
+      FROM pp_corretores_old
+    `);
+
+    await client.execute('DROP TABLE pp_corretores_old');
+
+    await client.execute('CREATE INDEX IF NOT EXISTS idx_pp_corretores_email ON pp_corretores(email)');
+    await client.execute('CREATE INDEX IF NOT EXISTS idx_pp_corretores_setup_token ON pp_corretores(setup_token)');
+
+    await client.execute('PRAGMA foreign_keys=ON');
+  } catch (err) {
+    console.error('[migração senha_hash] Erro:', err);
+  }
+}
+
 function garantirSchema() {
   if (_schemaPronto) return _schemaPronto;
   _schemaPronto = (async () => {
@@ -85,6 +125,8 @@ function garantirSchema() {
     await _tentarAlterTable(`ALTER TABLE pp_corretores ADD COLUMN setup_token TEXT`);
     await _tentarAlterTable(`ALTER TABLE pp_corretores ADD COLUMN setup_token_exp TEXT`);
     await _tentarAlterTable(`CREATE INDEX IF NOT EXISTS idx_pp_corretores_setup_token ON pp_corretores(setup_token)`);
+
+    await _migrarSenhaHashOpcional();
   })();
   return _schemaPronto;
 }
