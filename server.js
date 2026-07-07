@@ -635,16 +635,40 @@ app.delete('/api/pp/vendas/:id', autenticacaoPP, async (req, res) => {
   }
 });
 
-app.get('/api/gestor/pp/corretores', autenticacaoGestor, async (_req, res) => {
+// ─── Gestor: visão completa e irrestrita do Pior Patrão de um corretor ────────
+app.get('/api/gestor/pp/corretores/:id/detalhe', autenticacaoGestor, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ erro: 'ID inválido.' });
+
   try {
-    const lista = await pp_listarCorretores();
-    const listaComLink = lista.map(c => ({
-      ...c,
-      linkDefinirSenha: c.senha_definida ? null : `${getBaseUrl()}/pp/definir-senha?token=${c.setup_token}`
-    }));
-    return res.json({ items: listaComLink });
+    const corretor = await pp_buscarCorretorPorId(id);
+    if (!corretor) return res.status(404).json({ erro: 'Corretor não encontrado.' });
+
+    const cfg    = await pp_obterConfiguracao(id);
+    const vendas = await pp_listarVendas(id);
+
+    const custosItens    = cfg ? parseItensJson(cfg.custos_itens)    : [];
+    const objetivosItens = cfg ? parseItensJson(cfg.objetivos_itens) : [];
+
+    let metas = null;
+    if (custosItens.length || objetivosItens.length) {
+      metas = calcularMetas({ custosItens, objetivosItens, situacao: corretor.situacao });
+    }
+
+    return res.json({
+      id:             corretor.id,
+      nome:           corretor.nome,
+      email:          corretor.email,
+      situacao:       corretor.situacao,
+      ativo:          !!corretor.ativo,
+      senhaDefinida:  !!corretor.senha_hash,
+      custosItens,
+      objetivosItens,
+      metas,
+      vendas
+    });
   } catch (err) {
-    console.error('[pp corretores get] Erro:', err);
+    console.error('[pp detalhe gestor] Erro:', err);
     return res.status(500).json({ erro: 'Erro interno.' });
   }
 });
