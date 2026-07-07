@@ -240,6 +240,50 @@
       </div>
     </main>
   </div>
+  <!-- ══ PIOR PATRÃO — DETALHE (SOMENTE VISUALIZAÇÃO) ═══════════════════════ -->
+  <div class="painel-view" data-painel-view="pp-detalhe" aria-hidden="true">
+    <header class="painel-header">
+      <div class="painel-header__nav">
+        <button class="btn-voltar" id="btn-voltar-pp-detalhe" type="button">← Corretores</button>
+      </div>
+      <button class="btn-logout painel-header__btn-sair" type="button">Sair</button>
+    </header>
+
+    <div class="detalhe-meta">
+      <h2 class="detalhe-meta__nome" id="ppd-nome"></h2>
+      <div class="detalhe-meta__info">
+        <span id="ppd-email"></span>
+        <span class="detalhe-meta__sep" aria-hidden="true">·</span>
+        <span id="ppd-situacao"></span>
+        <span class="detalhe-meta__sep" aria-hidden="true">·</span>
+        <span id="ppd-status"></span>
+      </div>
+    </div>
+
+    <main class="painel-corpo painel-corpo--detalhe">
+
+      <div class="painel-secao">
+        <h3 class="painel-secao__titulo" style="font-size:1rem;">Custos mensais lançados</h3>
+        <div id="ppd-lista-custos"></div>
+      </div>
+
+      <div class="painel-secao">
+        <h3 class="painel-secao__titulo" style="font-size:1rem;">Objetivos lançados</h3>
+        <div id="ppd-lista-objetivos"></div>
+      </div>
+
+      <div class="painel-secao">
+        <h3 class="painel-secao__titulo" style="font-size:1rem;">Metas calculadas</h3>
+        <div id="ppd-metas" class="stats-grid"></div>
+      </div>
+
+      <div class="painel-secao">
+        <h3 class="painel-secao__titulo" style="font-size:1rem;">Vendas registradas</h3>
+        <div id="ppd-vendas"></div>
+      </div>
+
+    </main>
+  </div>
 
   <!-- ══ MODAL NOVO CORRETOR PP ══════════════════════════════════════════════ -->
   <div id="modal-pp" class="modal-overlay" aria-hidden="true"
