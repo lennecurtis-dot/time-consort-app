@@ -62,6 +62,13 @@ function formatarData(iso) {
   } catch (_) { return iso; }
 }
 
+function formatarDataSimples(iso) {
+  if (!iso) return '—';
+  const partes = String(iso).split('-');
+  if (partes.length === 3) return `${partes[2]}/${partes[1]}/${partes[0]}`;
+  return iso;
+}
+
 function labelDisc(k) {
   const m = { dominancia: 'Dominância (D)', influencia: 'Influência (I)',
                estabilidade: 'Estabilidade (S)', conformidade: 'Conformidade (C)' };
@@ -100,7 +107,6 @@ function abrirWhatsApp(link) {
   if (novaAba) {
     novaAba.location.href = link;
   } else {
-    // Bloqueio de pop-up: tenta navegação direta como último recurso
     window.location.href = link;
   }
 }
@@ -326,7 +332,7 @@ function renderizarPaginacao() {
   document.getElementById('btn-proxima-pag').disabled  = state.paginaAtual >= state.totalPaginas;
 }
 
-// ─── Detalhe ───────────────────────────────────────────────────────────────────
+// ─── Detalhe do Assessment ─────────────────────────────────────────────────────
 async function verDetalhe(id, origem = 'lista') {
   const container   = document.getElementById('detalhe-relatorio');
   const containerPP = document.getElementById('detalhe-pp');
@@ -378,7 +384,7 @@ async function verDetalhe(id, origem = 'lista') {
   }
 }
 
-// ─── Seção Pior Patrão dentro do detalhe do gestor ────────────────────────────
+// ─── Resumo Pior Patrão dentro do detalhe do Assessment ───────────────────────
 function renderizarPiorPatraoDetalhe(pp, container) {
   if (!pp || !pp.cadastrado) {
     container.innerHTML = `
@@ -617,6 +623,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-cadastrar-pp').addEventListener('click', cadastrarCorretorPP);
   document.getElementById('btn-outro-pp').addEventListener('click', resetarModalPP);
 
+  document.getElementById('btn-voltar-pp-detalhe').addEventListener('click', carregarPiorPatrao);
+
   if (state.token) {
     carregarDashboard();
   } else {
@@ -649,7 +657,8 @@ async function carregarPiorPatrao() {
     }
 
     tbody.innerHTML = lista.map(c => `
-      <tr>
+      <tr class="painel-tabela__linha" data-id="${esc(String(c.id))}" tabindex="0"
+          role="button" aria-label="Ver Pior Patrão de ${esc(c.nome)}">
         <td>${esc(c.nome)}</td>
         <td class="col-email">${esc(c.email)}</td>
         <td>
@@ -667,7 +676,7 @@ async function carregarPiorPatrao() {
           }
         </td>
         <td class="col-data">${esc(formatarData(c.criado_em))}</td>
-        <td class="col-link">
+        <td class="col-link" data-acoes="1">
           ${!c.senha_definida ? `
             <button class="btn-pp-acao" data-id="${esc(String(c.id))}"
                     data-nome="${esc(c.nome)}" data-acao="reenviar" type="button">
@@ -694,31 +703,177 @@ async function carregarPiorPatrao() {
       </tr>
     `).join('');
 
+    // Clique na linha (fora da coluna de ações) abre o detalhe completo
+    tbody.querySelectorAll('.painel-tabela__linha').forEach(tr => {
+      tr.addEventListener('click', e => {
+        if (e.target.closest('[data-acoes]')) return;
+        verDetalhePP(parseInt(tr.dataset.id));
+      });
+      tr.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          verDetalhePP(parseInt(tr.dataset.id));
+        }
+      });
+    });
+
     tbody.querySelectorAll('.btn-pp-acao--toggle').forEach(btn => {
-      btn.addEventListener('click', () => toggleCorretorPP(
-        parseInt(btn.dataset.id),
-        btn.dataset.ativo === '1'
-      ));
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        toggleCorretorPP(parseInt(btn.dataset.id), btn.dataset.ativo === '1');
+      });
     });
 
     tbody.querySelectorAll('.btn-pp-acao--excluir').forEach(btn => {
-      btn.addEventListener('click', () => excluirCorretorPP(
-        parseInt(btn.dataset.id),
-        btn.dataset.nome
-      ));
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        excluirCorretorPP(parseInt(btn.dataset.id), btn.dataset.nome);
+      });
     });
 
     tbody.querySelectorAll('[data-acao="reenviar"]').forEach(btn => {
-      btn.addEventListener('click', () => reenviarLinkPP(parseInt(btn.dataset.id), btn, 'copiar'));
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        reenviarLinkPP(parseInt(btn.dataset.id), btn, 'copiar');
+      });
     });
 
     tbody.querySelectorAll('[data-acao="whatsapp"]').forEach(btn => {
-      btn.addEventListener('click', () => reenviarLinkPP(parseInt(btn.dataset.id), btn, 'whatsapp'));
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        reenviarLinkPP(parseInt(btn.dataset.id), btn, 'whatsapp');
+      });
     });
 
   } catch (_) {
     document.getElementById('tbody-pp').innerHTML =
       '<tr><td colspan="6" class="painel-tabela__vazio">Erro ao carregar.</td></tr>';
+  }
+}
+
+// ─── Detalhe completo (irrestrito, somente leitura) do Pior Patrão ───────────
+async function verDetalhePP(id) {
+  navegarPara('pp-detalhe');
+
+  document.getElementById('ppd-nome').textContent     = 'Carregando…';
+  document.getElementById('ppd-email').textContent    = '';
+  document.getElementById('ppd-situacao').textContent = '';
+  document.getElementById('ppd-status').textContent   = '';
+  document.getElementById('ppd-lista-custos').innerHTML    = '<p class="pp-vazio">Carregando…</p>';
+  document.getElementById('ppd-lista-objetivos').innerHTML = '';
+  document.getElementById('ppd-metas').innerHTML            = '';
+  document.getElementById('ppd-vendas').innerHTML            = '';
+
+  try {
+    const { status, data } = await apiFetch(`/api/gestor/pp/corretores/${id}/detalhe`);
+    if (status === 401) { deslogar(); return; }
+
+    if (status !== 200) {
+      document.getElementById('ppd-nome').textContent = 'Erro ao carregar.';
+      return;
+    }
+
+    document.getElementById('ppd-nome').textContent     = data.nome;
+    document.getElementById('ppd-email').textContent    = data.email;
+    document.getElementById('ppd-situacao').textContent = labelSituacaoPP(data.situacao);
+    document.getElementById('ppd-status').textContent   =
+      (data.ativo ? 'Ativo' : 'Inativo') + (data.senhaDefinida ? ' · Senha criada' : ' · Aguardando senha');
+
+    // Custos
+    const listaCustosEl = document.getElementById('ppd-lista-custos');
+    if (!data.custosItens.length) {
+      listaCustosEl.innerHTML = '<p style="color:#5A6275; font-size:.875rem;">Nenhum custo lançado ainda.</p>';
+    } else {
+      listaCustosEl.innerHTML = `
+        <table class="painel-tabela" aria-label="Custos mensais">
+          <thead><tr><th>Descrição</th><th>Valor</th></tr></thead>
+          <tbody>
+            ${data.custosItens.map(it => `
+              <tr><td>${esc(it.nome)}</td><td>${brl(it.valor)}</td></tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    // Objetivos
+    const listaObjEl = document.getElementById('ppd-lista-objetivos');
+    if (!data.objetivosItens.length) {
+      listaObjEl.innerHTML = '<p style="color:#5A6275; font-size:.875rem;">Nenhum objetivo lançado ainda.</p>';
+    } else {
+      listaObjEl.innerHTML = `
+        <table class="painel-tabela" aria-label="Objetivos">
+          <thead><tr><th>Descrição</th><th>Valor</th></tr></thead>
+          <tbody>
+            ${data.objetivosItens.map(it => `
+              <tr><td>${esc(it.nome)}</td><td>${brl(it.valor)}</td></tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    // Metas
+    const metasEl = document.getElementById('ppd-metas');
+    if (!data.metas) {
+      metasEl.innerHTML = '<p style="color:#5A6275; font-size:.875rem;">Ainda não configurado.</p>';
+    } else {
+      metasEl.innerHTML = `
+        <div class="stat-card">
+          <span class="stat-card__rotulo">Custo mensal (+30%)</span>
+          <span class="stat-card__valor stat-card__valor--md">${brl(data.metas.custoMensalTotal)}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__rotulo">Total 12 meses (custos)</span>
+          <span class="stat-card__valor stat-card__valor--md">${brl(data.metas.custoAnualTotal)}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__rotulo">Objetivos (+30%)</span>
+          <span class="stat-card__valor stat-card__valor--md">${brl(data.metas.objetivoTotal)}</span>
+        </div>
+        <div class="stat-card stat-card--destaque">
+          <span class="stat-card__rotulo">Necessário ganhar / ano</span>
+          <span class="stat-card__valor">${brl(data.metas.ganhoAnual)}</span>
+        </div>
+        <div class="stat-card stat-card--destaque">
+          <span class="stat-card__rotulo">Necessário ganhar / mês</span>
+          <span class="stat-card__valor">${brl(data.metas.ganhoMensal)}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__rotulo">VGV necessário</span>
+          <span class="stat-card__valor stat-card__valor--md">${brl(data.metas.vgvNecessario)}</span>
+        </div>
+      `;
+    }
+
+    // Vendas
+    const vendasEl = document.getElementById('ppd-vendas');
+    if (!data.vendas.length) {
+      vendasEl.innerHTML = '<p style="color:#5A6275; font-size:.875rem;">Nenhuma venda registrada ainda.</p>';
+    } else {
+      vendasEl.innerHTML = `
+        <table class="painel-tabela" aria-label="Vendas">
+          <thead>
+            <tr>
+              <th>Descrição</th><th>Data</th><th>VGV</th><th>Comissão</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.vendas.map(v => `
+              <tr>
+                <td>${esc(v.descricao || 'Venda')}</td>
+                <td>${formatarDataSimples(v.data_venda)}</td>
+                <td>${brl(v.vgv)}</td>
+                <td>${brl(v.comissao)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+  } catch (_) {
+    document.getElementById('ppd-nome').textContent = 'Erro de conexão.';
   }
 }
 
